@@ -13,6 +13,7 @@ import logging
 import time
 import os
 import sys
+import sched
 from traceback import print_exc
 from pyecobee.const import (
     _LOGGER,
@@ -57,7 +58,7 @@ def findSubstr(s1, s2):
 class saveEcobeeData():
     def __init__(self):
         self.prevStatusTime = [0, 0]
-        DBname = '/home/jim/tools/Ecobee/MBthermostat.sched.sql'
+        DBname = '/home/jim/tools/Ecobee/MBthermostat.sql'
         self.DB = sqlite3.connect(DBname)
         self.DB.row_factory = sqlite3.Row
         self.c = {}
@@ -154,6 +155,7 @@ class saveEcobeeData():
                     'MORNING CLOUDS', 'SMOKE', 'LOW LEVEL HAZE']
         
     def ExtRuntimeData(self, API):
+        print(dt.datetime.now(), 'save.ExtRuntimeData')
         ERT = 'extendedRuntime'
         fiveMinutes = dt.timedelta(minutes = 5)
         for i in range(len(API.thermostatsExt)):
@@ -193,6 +195,7 @@ class saveEcobeeData():
                 self.DB.commit()   
 
     def ThermostatData(self, API):
+        print(dt.datetime.now(), 'save.ThermostatData')
         for i in range(len(API.thermostats)):
             print(API.thermostats[i]['runtime']['actualTemperature'] / 10.0, \
                   API.thermostats[i]['runtime']['actualHumidity'], \
@@ -244,6 +247,7 @@ class saveEcobeeData():
             self.DB.commit()
 
     def WeatherData(self, API):
+        print(dt.datetime.now(), 'save.WeatherData')
         insert = 'INSERT INTO Weather ( \n' +\
             'station, weatherSymbol, dateTime, condition, temperature, pressure, \n' +\
             'humidity, dewpoint, visibility, windSpeed, windGust, windDirection,   \n' +\
@@ -303,6 +307,7 @@ class ecobee(pyecobee.Ecobee):
         return False
 
     def getThermostatData(self):
+        print(dt.datetime.now(), 'getThermostatData')
         if self.access_token is None:
             rc = self.request_pin()
             print('request pin:', rc, ' PIN:', self.pin)
@@ -328,6 +333,7 @@ class ecobee(pyecobee.Ecobee):
         #pp.pprint(API.thermostats)
 
     def getExtThermostats(self) -> bool:
+        print(dt.datetime.now(), 'getExtThermostats')
         """Gets a json-list of thermostats from ecobee and caches in self.thermostats."""
         param_string = {
             "selection": {
@@ -363,6 +369,11 @@ class ecobee(pyecobee.Ecobee):
                 if not rc:
                     print('get_thermostats() failed again')
 
+    def getWeather(self):
+        # rely on the data returned by getThermostatData()
+        print(dt.datetime.now(), 'getWeather')
+        pass
+
         
     def dumpEcobee(self):
         print('thermostats:', self.thermostats)
@@ -374,13 +385,33 @@ class ecobee(pyecobee.Ecobee):
         print('access_token:', self.access_token)
         print('refresh_token:', self.refresh_token)
 
+class collectThermostatData:
+    def __init__(self, scheduler):
+        self.scheduler = scheduler
+        self.starttime = 0
+
+    def Schedule(self, Getter, Saver, API, hours = 0, minutes = 0, seconds = 0):
+        self.frequency = dt.timedelta(hours = hours, minutes = minutes, seconds = seconds)
+        self.Getter    = Getter
+        self.Saver     = Saver
+        self.API       = API
+        now = dt.datetime.now()
+        firstTime = now.replace(hour = 0, minute = 0, second = 0, microsecond = 0) -\
+                    dt.timedelta(weeks = 1)
+        while firstTime < now:
+            firstTime += self.frequency
+        self.starttime = firstTime
+        print('Schedule Start time:', self.starttime)
+        self.scheduler.enterabs(time.mktime(self.starttime.timetuple()), 1, self.Collector, ())
+
+    def Collector(self):
+        # reschedule
+        self.starttime = self.starttime + self.frequency
+        self.scheduler.enterabs(time.mktime(self.starttime.timetuple()), 1, self.Collector, ())
+        self.Getter()
+        self.Saver(self.API)
+
 def main():
-    # want unbuffered stdout for use with "tee"
-    buffered = os.getenv('PYTHONUNBUFFERED')
-    if buffered is None:
-        myenv = os.environ.copy()
-        myenv['PYTHONUNBUFFERED'] = 'Please'
-        os.execve(sys.argv[0], sys.argv, myenv)
     pp = pprint.PrettyPrinter(indent=4, sort_dicts=False)
     #config = {'API_KEY' : 'ObsoleteAPIkey', 'INCLUDE_NOTIFICATIONS' : 'True'}
     #API = pyecobee.Ecobee(config = config)
@@ -389,7 +420,25 @@ def main():
     API.read_config_from_file()
     save = saveEcobeeData()
     #umpEcobee(API)
+    # Build a scheduler object that will look at absolute times
+    scheduler = sched.scheduler(time.time, time.sleep)
 
+    runtime = collectThermostatData(scheduler)
+    runtime.Schedule(API.getThermostatData, save.ThermostatData, API, minutes = 2, seconds = 45)
+    #runtime.Schedule(API.getThermostatData, save.ThermostatData, API, seconds = 10)
+    extRuntime = collectThermostatData(scheduler)
+    extRuntime.Schedule(API.getExtThermostats, save.ExtRuntimeData, API, minutes = 12)
+    weather = collectThermostatData(scheduler)
+    weather.Schedule(API.getWeather, save.WeatherData, API, minutes = 25)
+    
+    print(len(scheduler.queue))
+    #print(scheduler.queue)
+    for event in scheduler.queue:
+        print(dt.datetime.fromtimestamp(event.time), str(event.action).split(' ')[2])
+
+    scheduler.run()
+    
+    '''
     while True:
         API.getThermostatData()
         save.ThermostatData(API)
@@ -397,10 +446,14 @@ def main():
         API.getExtThermostats()
         save.ExtRuntimeData(API)
         time.sleep(179)
-
-
-
+    '''
 
 
 if __name__ == '__main__':
-  main()
+    # want unbuffered stdout for use with "tee"
+    buffered = os.getenv('PYTHONUNBUFFERED')
+    if buffered is None:
+        myenv = os.environ.copy()
+        myenv['PYTHONUNBUFFERED'] = 'Please'
+        os.execve(sys.argv[0], sys.argv, myenv)
+    main()
