@@ -32,11 +32,15 @@ from pyecobee.const import (
 )
 
 def setLogging(logger):
+    global LOGFILE
     logger.setLevel(logging.DEBUG)
     # create file handler which logs even debug messages
-    fh = logging.FileHandler('ecobee.log')
+    #fh = logging.FileHandler('ecobee.log')
+    fh = logging.FileHandler(LOGFILE)
     fh.setLevel(logging.ERROR)
     fh.setLevel(logging.WARNING)
+    ###########################################
+    fh.setLevel(logging.DEBUG)
     # create console handler with a higher log level
     ch = logging.StreamHandler()
     ch.setLevel(logging.ERROR)
@@ -57,8 +61,9 @@ def findSubstr(s1, s2):
 
 class saveEcobeeData():
     def __init__(self):
+        global DBname
         self.prevStatusTime = [0, 0]
-        DBname = '/home/jim/tools/Ecobee/MBthermostat.sql'
+        #DBname = '/home/jim/tools/Ecobee/MBthermostat.sched.sql'
         self.DB = sqlite3.connect(DBname)
         self.DB.row_factory = sqlite3.Row
         self.c = {}
@@ -330,7 +335,7 @@ class ecobee(pyecobee.Ecobee):
                 if not rc:
                     print('get_thermostats() failed again')
         #print('thermostats:')
-        #pp.pprint(API.thermostats)
+        #self.pp.pprint(self.thermostats)
 
     def getExtThermostats(self) -> bool:
         print(dt.datetime.now(), 'getExtThermostats')
@@ -354,10 +359,6 @@ class ecobee(pyecobee.Ecobee):
             #print('thermostatsExt:1')
             #self.pp.pprint(self.thermostatsExt)
             return True
-        except (KeyError, TypeError):
-            print('type is:', e.__class__.__name__)
-            print_exc()
-            return False
         except pyecobee.errors.ExpiredTokenError as e:
             #print('type is:', e.__class__.__name__)
             #print_exc()
@@ -368,7 +369,11 @@ class ecobee(pyecobee.Ecobee):
                 rc = self.getExtTthermostats()
                 if not rc:
                     print('get_thermostats() failed again')
-
+        except (KeyError, TypeError):
+            print('type is:', e.__class__.__name__)
+            print_exc()
+            return False
+        
     def getWeather(self):
         # rely on the data returned by getThermostatData()
         print(dt.datetime.now(), 'getWeather')
@@ -385,6 +390,54 @@ class ecobee(pyecobee.Ecobee):
         print('access_token:', self.access_token)
         print('refresh_token:', self.refresh_token)
 
+    def my_set_Climate_hold(
+            self,
+            index: int,
+            climate: str,
+            hold_type: str = "nextTransition",
+            hold_hours:
+            int = None,
+            start_date: str = None,
+            start_time: str = None,
+            end_date:   str = None,
+            end_time:   str = None,
+    ) -> None:
+        """Sets a climate hold (away, home, sleep)."""
+        body = {
+            "selection": {
+                "selectionType": "registered",
+                "selectionMatch": "",
+            },
+            "functions": [
+                {
+                    "type": "setHold",
+                    "params": {"holdType": hold_type,
+                               "holdClimateRef": climate,
+                               "holdHours": hold_hours,
+                               "startDate": start_date,
+                               "startTime": start_time,
+                               "endDate":   end_date,
+                               "endTime":   end_time
+                               },
+                }
+            ],
+        }
+
+        if hold_type != "holdHours":
+            del body["functions"][0]["params"]["holdHours"]
+
+        if hold_type != "dateTime":
+            for option in ["start_date", "start_time", "end_date", "end_time"]:
+                del body["functions"][0]["params"][option]
+
+        log_msg_action = "set climate hold"
+        #
+        print(body)
+        try:
+            self._request("POST", ECOBEE_ENDPOINT_THERMOSTAT, log_msg_action, body=body)
+        except (ExpiredTokenError, InvalidTokenError) as err:
+            raise err
+        
 class collectThermostatData:
     def __init__(self, scheduler):
         self.scheduler = scheduler
@@ -411,6 +464,110 @@ class collectThermostatData:
         self.Getter()
         self.Saver(self.API)
 
+class deHumidify:
+    def __init__(self, scheduler):
+        self.scheduler = scheduler
+        self.starttime = 0
+        self.pp = pprint.PrettyPrinter(indent=4, sort_dicts=False)
+        
+    def Schedule(self, API, startHour = 6, startMinute = 30, duration = 30):
+        self.API = API
+        self.duration = duration
+        print(dt.datetime.now(), 'deHumidify.Schedule')
+        now = dt.datetime.now()
+        firstTime = now.replace(hour = startHour, minute = startMinute,
+                                second = 0, microsecond = 0) - dt.timedelta(days = 1)
+        while firstTime < now:
+            firstTime += dt.timedelta(days = 1)
+        self.starttime = firstTime
+        print('deHumidify.Schedule Start time:', self.starttime)
+        ##### testing
+        #firstTime = now + dt.timedelta(seconds = 11)
+        #self.starttime = firstTime
+        #print('deHumidify.Schedule Start time:', self.starttime)
+        #####
+        self.scheduler.enterabs(time.mktime(self.starttime.timetuple()), 1, self.forceRun, ())
+
+    def forceRun(self):
+        print(dt.datetime.now(), 'deHumidify.forceRun')
+        # allow getThermostatData to run first
+        if self.API.thermostats is  None:
+            retry = dt.datetime.now() + dt.timedelta(minutes = 1)
+            print('deHumidify.forceRun try again at ', retry)
+            self.scheduler.enterabs(time.mktime(retry.timetuple()), 1, self.forceRun, ())
+            return
+        print('deHumidify.forceRun has data')
+        self.starttime += dt.timedelta(days = 1)
+        self.scheduler.enterabs(time.mktime(self.starttime.timetuple()), 1, self.forceRun, ())
+        print('deHumidify.forceRun next:', self.starttime)
+
+        icebox = 'smart1'
+        oven   = 'smart2'
+        indoorTemp  = 0.0
+        outdoorHigh = 0.0
+        for i in range(len(self.API.thermostats)):
+            indoorTemp  += self.API.thermostats[i]['runtime']['actualTemperature']
+            outdoorHigh += self.API.thermostats[i]['weather']['forecasts'][0]['tempHigh']
+        indoorTemp  = indoorTemp  / 10.0 / len(self.API.thermostats)
+        outdoorHigh = outdoorHigh / 10.0 / len(self.API.thermostats)
+        if indoorTemp >= 65 and outdoorHigh > 70.0:
+            climate = icebox
+        else:
+            climate = oven
+        print('indoorTemp:', indoorTemp, 'outdoorHigh:', outdoorHigh, 'climate:', climate)
+        '''
+        for i in range(len(self.API.thermostats)):
+            if self.API.thermostats[i]['events'][0]['type'] == 'vacation':
+                print(self.API.thermostats[i]['name'], 'is in vacation mode')
+            else:
+                print(self.API.thermostats[i]['name'], 'is NOT in vacation mode')
+                continue
+        '''
+        #
+        # check for vacation mode; if not reschedule for tomorrow
+        # save vacation name, start, end, temps, fan
+        # delete vacation
+        # check projected high temp and choose Icebox ot Oven
+        # set "climate" for duration
+        # reset vacation - will that stack or do I need to wait?
+
+        vacation = self.API.thermostats[0]['events'][0]
+        print('\n\nZZZ copied vacation ZZZ\n')
+        self.pp.pprint(vacation)
+        
+        self.API.Delete_vacation(index = 0, vacation = vacation['name'])
+        print('\n\nZZZ deleted vacation thermostat ZZZ\n')
+        self.API.getThermostatData()
+        time.sleep(10)
+        
+        finish = dt.datetime.now() + dt.timedelta(minutes = self.duration)
+        # add new vacation to start after hold
+        self.API.Create_vacation(index = 0,
+                                 vacation_name = 'notAround',
+                                 cool_temp     = int(vacation['coolHoldTemp']) / 10,
+                                 heat_temp     = int(vacation['heatHoldTemp']) / 10,
+                                 start_date    = str(finish.date()),
+                                 start_time    = str(finish.time())[0:8],
+                                 end_date      = vacation['endDate'],
+                                 end_time      = vacation['endTime']
+                                 )
+        time.sleep(10)
+        self.API.getThermostatData()
+        print('\n\nZZZ after adding vacation thermostat ZZZ\n')
+        self.pp.pprint(self.API.thermostats)
+        
+        self.API.my_set_Climate_hold(index = 0,
+                                     climate   = climate,
+                                     hold_type = 'dateTime',
+                                     end_date  = str(finish.date()),
+                                     end_time  = str(finish.time())[0:8]
+                                     )
+        time.sleep(10)
+        self.API.getThermostatData()
+        print('\n\nZZZ after adding hold thermostat ZZZ\n')
+        self.pp.pprint(self.API.thermostats)
+        
+        
 def main():
     pp = pprint.PrettyPrinter(indent=4, sort_dicts=False)
     #config = {'API_KEY' : 'ObsoleteAPIkey', 'INCLUDE_NOTIFICATIONS' : 'True'}
@@ -419,23 +576,25 @@ def main():
     setLogging(pyecobee._LOGGER)
     API.read_config_from_file()
     save = saveEcobeeData()
+ 
     #umpEcobee(API)
     # Build a scheduler object that will look at absolute times
     scheduler = sched.scheduler(time.time, time.sleep)
 
     runtime = collectThermostatData(scheduler)
     runtime.Schedule(API.getThermostatData, save.ThermostatData, API, minutes = 2, seconds = 45)
-    #runtime.Schedule(API.getThermostatData, save.ThermostatData, API, seconds = 10)
     extRuntime = collectThermostatData(scheduler)
     extRuntime.Schedule(API.getExtThermostats, save.ExtRuntimeData, API, minutes = 12)
     weather = collectThermostatData(scheduler)
     weather.Schedule(API.getWeather, save.WeatherData, API, minutes = 25)
+    dehumidify = deHumidify(scheduler)
+    dehumidify.Schedule(API, startHour = 6, startMinute = 30, duration = 30)
     
     print(len(scheduler.queue))
     #print(scheduler.queue)
     for event in scheduler.queue:
         print(dt.datetime.fromtimestamp(event.time), str(event.action).split(' ')[2])
-
+    
     scheduler.run()
     
     '''
@@ -447,8 +606,10 @@ def main():
         save.ExtRuntimeData(API)
         time.sleep(179)
     '''
-
-
+DBname  = '/home/jim/tools/Ecobee/MBthermostat.sql'
+#DBname  = '/home/jim/tools/Ecobee/MBthermostat.sched.sql'
+LOGFILE = '/home/jim/tools/Ecobee/ecobee.log'
+#LOGFILE = '/home/jim/tools/Ecobee/ecobee.sched.log'
 if __name__ == '__main__':
     # want unbuffered stdout for use with "tee"
     buffered = os.getenv('PYTHONUNBUFFERED')
