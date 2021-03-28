@@ -745,19 +745,19 @@ class Ecobee(object):
                             "ecobee access token expired; token refresh required"
                         )
                     else:
-                        print('retrying from _request')
+                        #print('retrying from _request')
                         rc = self.refresh_tokens()
-                        print('_request: refresh_tokens returned:', rc)
+                        #print('_request: refresh_tokens returned:', rc)
                         self._write_config()
-                        print('_request: called ._write_config()')
+                        #print('_request: called ._write_config()')
                         _LOGGER.warning(
-                            f"Attempting retry for ExpiredTokenError"
+                            f"Attempting retry for ExpiredTokenError "
                             f"While attempting to {log_msg_action}: "
                             f"method: {method}: endpoint: {endpoint}: "
                             f"params: {params}: body: {body}: "
                             f"auth_request: {auth_request}: retrying: {retrying}: "
                             )
-                        self._request(
+                        response = self._request(
                             method,
                             endpoint,
                             log_msg_action,
@@ -765,7 +765,9 @@ class Ecobee(object):
                             body,
                             auth_request,
                             retrying = True
-                            )
+                        )
+                        # responce is responce.json() at this point
+                        return response
                 else:
                     _LOGGER.error(
                         f"Error from ecobee while attempting to {log_msg_action}: "

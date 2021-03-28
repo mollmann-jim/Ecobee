@@ -24,7 +24,7 @@ def setLogging(logger):
     fh = logging.FileHandler(LOGFILE)
     fh.setLevel(logging.ERROR)
     fh.setLevel(logging.WARNING)
-    fh.setLevel(logging.DEBUG)
+    #fh.setLevel(logging.DEBUG)
     # create console handler with a higher log level
     ch = logging.StreamHandler()
     ch.setLevel(logging.ERROR)
@@ -345,12 +345,6 @@ class ecobee(pyecobee.Ecobee):
         name = '  '
         if index >= len(self.thermostats) or event >= len(self.thermostats[index]['events']):
             return name
-        start = self.thermostats[index]['events'][event]['startDate'] + ' ' + \
-            self.thermostats[index]['events'][event]['startTime']
-        start = dt.datetime.strptime(start, '%Y-%m-%d %H:%M:%S')
-        end = self.thermostats[index]['events'][event]['endDate'] + ' ' + \
-            self.thermostats[index]['events'][event]['endTime']
-        end = dt.datetime.strptime(end, '%Y-%m-%d %H:%M:%S')
         if self.thermostats[index]['events'][event]['type'] == 'vacation':
             name = 'vacation'
         elif self.thermostats[index]['events'][event]['type'] == 'hold':
@@ -359,9 +353,8 @@ class ecobee(pyecobee.Ecobee):
             name = '  '
         else:
             name = 'unknown'
-        now = dt.datetime.now()
-        if now > start and now < end and name is not None:
-                name = '*' + name
+        if self.thermostats[index]['events'][event]['running']:
+            name = '*' + name
         return name
 
 class Status():
@@ -406,11 +399,12 @@ class Status():
         fmt = '{:17s} ' + fmt + fmt + ' {:s}'
         now = dt.datetime.now().replace(microsecond = 0)
         Name = [[]]
-        # fill the array in case there is only hte "template" event
+        # fill the array in case there is only the "template" event
         for i in range(2):
             Name.append([])
             for j in range(2):
                 Name[i].append('   ')
+        # There may be 3 or more events. E.g. vacation, climate hold, template
         for i in range(len(self.API.thermostats)):
             if i > 1:
                 Name.append([])
@@ -424,7 +418,6 @@ class Status():
                     print(i, j, Name)
                     pp = pprint.PrettyPrinter(indent=4, sort_dicts=False)
                     pp.pprint(self.API.thermostats)
-                    z=pp/0
         print(fmt.format(str(now),
                          self.API.thermostats[0]['name'].replace('stairs', ''),
                          self.API.thermostats[0]['runtime']['actualTemperature'] / 10.0,
@@ -537,20 +530,10 @@ class deHumidify:
                                                                        outdoorHigh,
                                                                        climate)
         self.Status(note)
-        #
-        # check for vacation mode; if not reschedule for tomorrow
-        # save vacation name, start, end, temps, fan
-        # delete vacation
-        # check projected high temp and choose Icebox or Oven
-        # set "climate" for duration
-        # reset vacation - will that stack or do I need to wait?
 
         vacation = self.API.thermostats[0]['events'][0]
-        #print('\n\nZZZ copied vacation ZZZ\n')
-        self.pp.pprint(vacation)
         
         self.API.Delete_vacation(index = 0, vacation = vacation['name'])
-        #print('\n\nZZZ deleted vacation thermostat ZZZ\n')
         time.sleep(10)
         self.API.getThermostatData()
         self.Status('deHumidify: vacation deleted')
@@ -569,7 +552,6 @@ class deHumidify:
         time.sleep(10)
         self.API.getThermostatData()
         self.Status('deHumidify: vacation created')
-        #print('\n\nZZZ after adding vacation thermostat ZZZ\n')
         #self.pp.pprint(self.API.thermostats)
         
         self.API.Set_Climate_hold(index = 0,
@@ -581,7 +563,6 @@ class deHumidify:
         time.sleep(10)
         self.API.getThermostatData()
         self.Status('deHumidify: climate hold added\n\n')
-        #print('\n\nZZZ after adding hold thermostat ZZZ\n')
         self.pp.pprint(self.API.thermostats)
         
         
@@ -596,7 +577,6 @@ def main():
     API.getThermostatData()
     save = saveEcobeeData()
  
-    #umpEcobee(API)
     # Build a scheduler object that will look at absolute times
     scheduler = sched.scheduler(time.time, time.sleep)
 
@@ -604,26 +584,23 @@ def main():
     runtime.Schedule(API.getThermostatData, save.ThermostatData, API, minutes = 2, seconds = 45)
     extRuntime = collectThermostatData(scheduler)
     extRuntime.Schedule(API.getExtThermostats, save.ExtRuntimeData, API, minutes = 12)
+    
     weather = collectThermostatData(scheduler)
     weather.Schedule(API.getWeather, save.WeatherData, API, minutes = 25)
+
     header = Status(scheduler)
-    header.Schedule(API, header.printHeaderLine, minutes = 20)
+    header.Schedule(API, header.printHeaderLine, minutes = 40)
     status = Status(scheduler)
     status.Schedule(API, status.printStatusLine, minutes = 3)
+
     dehumidify = deHumidify(scheduler)
     dehumidify.Schedule(API, status.addLine, startHour = 6, startMinute = 30, duration = 30)
 
-    print('runtime:\t', runtime)
-    print('extRuntime:\t', extRuntime)
-    print('weather:\t', weather)
-    print('header:\t\t', header)
-    print('status:\t\t', status)
-
-    ###############3
+    ###############3 debug
     '''
-    DH = dt.datetime.now().replace(microsecond = 0) + dt.timedelta(minutes = 60)
+    DH = dt.datetime.now().replace(microsecond = 0) + dt.timedelta(minutes = 10)
     dehumidify.Schedule(API, status.addLine, startHour = DH.hour,
-                        startMinute = DH.minute, duration = 15)
+                        startMinute = DH.minute, duration = 30)
     '''
     ###############
     
