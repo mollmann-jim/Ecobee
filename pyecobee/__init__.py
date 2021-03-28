@@ -219,7 +219,29 @@ class Ecobee(object):
     def update(self) -> bool:
         """Gets new thermostat data from ecobee; wrapper for get_thermostats."""
         return self.get_thermostats()
+    
+    def getExtThermostats(self) -> bool:
+        #print(dt.datetime.now(), 'getExtThermostats')
+        """Gets a json-list of thermostats from ecobee and caches in self.thermostats."""
+        param_string = {
+            "selection": {
+                "selectionType": "registered",
+                "includeExtendedRuntime": "true",
+            }
+        }
+        params = {"json": json.dumps(param_string)}
+        log_msg_action = "get extended thermostats"
 
+        response = self._request(
+            "GET", ECOBEE_ENDPOINT_THERMOSTAT, log_msg_action, params=params
+        )
+
+        try:
+            self.thermostatsExt = response["thermostatList"]
+            return True
+        except (KeyError, TypeError):
+            return False
+        
     def set_hvac_mode(self, index: int, hvac_mode: str) -> None:
         """Sets the HVAC mode (auto, auxHeatOnly, cool, heat, off)."""
         body = {
@@ -362,7 +384,54 @@ class Ecobee(object):
             self._request("POST", ECOBEE_ENDPOINT_THERMOSTAT, log_msg_action, body=body)
         except (ExpiredTokenError, InvalidTokenError) as err:
             raise err
+        
+    def Set_Climate_hold(
+            self,
+            index: int,
+            climate: str,
+            hold_type: str = "nextTransition",
+            hold_hours:
+            int = None,
+            start_date: str = None,
+            start_time: str = None,
+            end_date:   str = None,
+            end_time:   str = None,
+    ) -> None:
+        """Sets a climate hold (away, home, sleep)."""
+        body = {
+            "selection": {
+                "selectionType": "registered",
+                "selectionMatch": "",
+            },
+            "functions": [
+                {
+                    "type": "setHold",
+                    "params": {"holdType": hold_type,
+                               "holdClimateRef": climate,
+                               "holdHours": hold_hours,
+                               "startDate": start_date,
+                               "startTime": start_time,
+                               "endDate":   end_date,
+                               "endTime":   end_time
+                               },
+                }
+            ],
+        }
 
+        if hold_type != "holdHours":
+            del body["functions"][0]["params"]["holdHours"]
+
+        if hold_type != "dateTime":
+            for option in ["start_date", "start_time", "end_date", "end_time"]:
+                del body["functions"][0]["params"][option]
+
+        log_msg_action = "set climate hold"
+        #
+        try:
+            self._request("POST", ECOBEE_ENDPOINT_THERMOSTAT, log_msg_action, body=body)
+        except (ExpiredTokenError, InvalidTokenError) as err:
+            raise err
+        
     def create_vacation(
         self,
         index: int,
