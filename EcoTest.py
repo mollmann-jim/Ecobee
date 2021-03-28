@@ -201,6 +201,9 @@ class saveEcobeeData():
 
     def ThermostatData(self, API):
         print(dt.datetime.now(), 'save.ThermostatData')
+        if API.thermostats is None:
+            print('API.thermostats is None')
+            return
         for i in range(len(API.thermostats)):
             print(API.thermostats[i]['runtime']['actualTemperature'] / 10.0, \
                   API.thermostats[i]['runtime']['actualHumidity'], \
