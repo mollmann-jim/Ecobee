@@ -553,13 +553,15 @@ class deHumidify:
         self.API.getThermostatData()
         self.Status('deHumidify: vacation created')
         #self.pp.pprint(self.API.thermostats)
-        
-        self.API.Set_Climate_hold(index = 0,
-                                  climate   = climate,
-                                  hold_type = 'dateTime',
-                                  end_date  = str(finish.date()),
-                                  end_time  = str(finish.time())[0:8]
-                                  )
+
+        for i in range(len(self.API.thermostats)):
+            self.API.Set_Climate_hold(index = i,
+                                      climate   = climate,
+                                      hold_type = 'dateTime',
+                                      end_date  = str(finish.date()),
+                                      end_time  = str(finish.time())[0:8]
+                                      )
+            time.sleep(10)
         time.sleep(10)
         self.API.getThermostatData()
         self.Status('deHumidify: climate hold added\n\n')
