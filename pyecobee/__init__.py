@@ -387,11 +387,10 @@ class Ecobee(object):
         
     def Set_Climate_hold(
             self,
-            index: int,
             climate: str,
             hold_type: str = "nextTransition",
-            hold_hours:
-            int = None,
+            index:      int = None,
+            hold_hours: int = None,
             start_date: str = None,
             start_time: str = None,
             end_date:   str = None,
@@ -424,6 +423,13 @@ class Ecobee(object):
         if hold_type != "dateTime":
             for option in ["start_date", "start_time", "end_date", "end_time"]:
                 del body["functions"][0]["params"][option]
+
+        if index is not None:
+            del body["selection"]
+            body["selection"] = {
+                "selectionType": "thermostats",
+                "selectionMatch": self.thermostats[index]["identifier"],
+                }
 
         log_msg_action = "set climate hold"
         #
