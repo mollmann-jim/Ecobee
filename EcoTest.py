@@ -349,6 +349,9 @@ class ecobee(pyecobee.Ecobee):
             name = 'vacation'
         elif self.thermostats[index]['events'][event]['type'] == 'hold':
             name = self.thermostats[index]['events'][event]['holdClimateRef']
+            if name == '':
+                name = 'H ' + \
+                    self.thermostats[index]['events'][event]['endTime'][:5]
         elif self.thermostats[index]['events'][event]['type'] == 'template':
             name = '  '
         else:
