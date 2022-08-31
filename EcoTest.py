@@ -554,7 +554,9 @@ class deHumidify:
                                  )
         time.sleep(10)
         self.API.getThermostatData()
-        self.Status('deHumidify: vacation created')
+        self.Status('deHumidify: vacation created' +
+                    str(int(vacation['coolHoldTemp']) / 10) + ' / ' +
+                    str(int(vacation['heatHoldTemp']) / 10))
         #self.pp.pprint(self.API.thermostats)
 
         for i in range(len(self.API.thermostats)):
@@ -599,7 +601,7 @@ def main():
     status.Schedule(API, status.printStatusLine, minutes = 3)
 
     dehumidify = deHumidify(scheduler)
-    dehumidify.Schedule(API, status.addLine, startHour = 6, startMinute = 30, duration = 30)
+    dehumidify.Schedule(API, status.addLine, startHour = 6, startMinute = 30, duration = 60)
 
     ###############3 debug
     '''
