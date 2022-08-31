@@ -76,9 +76,9 @@ def main():
     # intialize API.thermostats
     API.getThermostatData()
     for i in range(len(API.thermostats)):
-        del API.thermostats[i]['notificationSettings']
+        #del API.thermostats[i]['notificationSettings']
         del API.thermostats[i]['program']
-        del API.thermostats[i]['settings']
+        #del API.thermostats[i]['settings']
         
     pp.pprint(API.thermostats)
 
