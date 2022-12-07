@@ -44,10 +44,11 @@ def findSubstr(s1, s2):
     return None
 
 class saveEcobeeData():
-    def __init__(self):
+    def __init__(self, thermostats = []):
         global DBname
-        self.prevStatusTime = [0, 0]
+        self.prevStatusTime = [0, 0, 0, 0]
         #DBname = '/home/jim/tools/Ecobee/MBthermostat.sched.sql'
+        self.thermostats = thermostats
         self.DB = sqlite3.connect(DBname)
         self.DB.row_factory = sqlite3.Row
         self.c = {}
@@ -56,7 +57,7 @@ class saveEcobeeData():
         self.pp = pprint.PrettyPrinter(indent=4, sort_dicts=False)
         
     def initDB(self):
-        for table in ['Upstairs', 'Downstairs']:
+        for table in self.thermostats:
             self.c[table] = self.DB.cursor()
             #drop = 'DROP TABLE IF EXISTS ' + table + ';'
             #c[table].execute(drop)
@@ -148,6 +149,10 @@ class saveEcobeeData():
         ERT = 'extendedRuntime'
         fiveMinutes = dt.timedelta(minutes = 5)
         for i in range(len(API.thermostatsExt)):
+            #print('XXX name:',  API.thermostatsExt[i]['name'], i)
+            if API.thermostatsExt[i]['name'] not in self.thermostats:
+                #print('XXX skipping')
+                continue
             table = API.thermostatsExt[i]['name'] + 'X'
             lastReading = dt.datetime.strptime(API.thermostatsExt[i][ERT]['lastReadingTimestamp'],
                                                '%Y-%m-%d %H:%M:%S')
@@ -195,6 +200,10 @@ class saveEcobeeData():
                   API.thermostats[i]['runtime']['lastStatusModified'], \
                   API.thermostats[i]['name'])
             '''
+            #print('ZZZ name:',  API.thermostats[i]['name'], i)
+            if API.thermostats[i]['name'] not in self.thermostats:
+                #print('ZZZ skipping')
+                continue
             table = API.thermostats[i]['name']
             insert = 'INSERT INTO ' + table + ' (\n' +\
                 'statusTime, temp, humidity, coolSetPoint, heatSetPoint, \n' +\
@@ -360,10 +369,12 @@ class ecobee(pyecobee.Ecobee):
             name = '*' + name
         return name
 
-class Status():
-    def __init__(self, scheduler):
+class Status:
+    def __init__(self, scheduler, thermostats = []):
         self.scheduler = scheduler
         self.starttime = 0
+        self.thermostats = thermostats
+        self.pp = pprint.PrettyPrinter(indent=4, sort_dicts=False)
         
     def Schedule(self, API, Printer, hours = 0, minutes = 0, seconds = 0):
         self.frequency = dt.timedelta(hours = hours, minutes = minutes, seconds = seconds)
@@ -403,15 +414,24 @@ class Status():
         now = dt.datetime.now().replace(microsecond = 0)
         Name = [[]]
         # fill the array in case there is only the "template" event
-        for i in range(2):
+        for i in range(4):
             Name.append([])
             for j in range(2):
                 Name[i].append('   ')
         # There may be 3 or more events. E.g. vacation, climate hold, template
+        myTherms = []
+        #self.pp.pprint(Name)
         for i in range(len(self.API.thermostats)):
+            if self.API.thermostats[i]['name'] not in self.thermostats:
+                #print('SSS Skipping:',  self.API.thermostats[i]['name'])
+                continue
+            myTherms.append(i)
+            '''
             if i > 1:
                 Name.append([])
+            '''
             for j in range(len(self.API.thermostats[i]['events'])):
+                #print('MMM', i, j, self.API.getCurrentMode(i, j))
                 try:
                     if j > 1:
                         Name[i].append(self.API.getCurrentMode(i, j))
@@ -421,21 +441,24 @@ class Status():
                     print(i, j, Name)
                     pp = pprint.PrettyPrinter(indent=4, sort_dicts=False)
                     pp.pprint(self.API.thermostats)
+        #print('sss myTherms:', myTherms)
+        (A, B) = myTherms
+        #self.pp.pprint(Name)
         print(fmt.format(str(now),
-                         self.API.thermostats[0]['name'].replace('stairs', ''),
-                         self.API.thermostats[0]['runtime']['actualTemperature'] / 10.0,
-                         self.API.thermostats[0]['runtime']['actualHumidity'],
-                         self.API.thermostats[0]['runtime']['desiredHeat'] / 10.0,
-                         self.API.thermostats[0]['runtime']['desiredCool'] / 10.0,
-                         Name[0][0],
-                         Name[0][1],
-                         self.API.thermostats[1]['name'].replace('stairs', ''),
-                         self.API.thermostats[1]['runtime']['actualTemperature'] / 10.0,
-                         self.API.thermostats[0]['runtime']['actualHumidity'],
-                         self.API.thermostats[1]['runtime']['desiredHeat'] / 10.0,
-                         self.API.thermostats[1]['runtime']['desiredCool'] / 10.0,
-                         Name[1][0],
-                         Name[1][1],
+                         self.API.thermostats[A]['name'].replace('stairs', '').replace('Room', ''),
+                         self.API.thermostats[A]['runtime']['actualTemperature'] / 10.0,
+                         self.API.thermostats[A]['runtime']['actualHumidity'],
+                         self.API.thermostats[A]['runtime']['desiredHeat'] / 10.0,
+                         self.API.thermostats[A]['runtime']['desiredCool'] / 10.0,
+                         Name[A][0],
+                         Name[A][1],
+                         self.API.thermostats[B]['name'].replace('stairs', '').replace('Room', ''),
+                         self.API.thermostats[B]['runtime']['actualTemperature'] / 10.0,
+                         self.API.thermostats[B]['runtime']['actualHumidity'],
+                         self.API.thermostats[B]['runtime']['desiredHeat'] / 10.0,
+                         self.API.thermostats[B]['runtime']['desiredCool'] / 10.0,
+                         Name[B][0],
+                         Name[B][1],
                          note
                          ))
     def dump(self):
@@ -449,7 +472,7 @@ class collectThermostatData:
     def __init__(self, scheduler):
         self.scheduler = scheduler
         self.starttime = 0
-
+        
     def Schedule(self, Getter, Saver, API, hours = 0, minutes = 0, seconds = 0):
         self.frequency = dt.timedelta(hours = hours, minutes = minutes, seconds = seconds)
         self.Getter    = Getter
@@ -472,9 +495,10 @@ class collectThermostatData:
         self.Saver(self.API)
 
 class deHumidify:
-    def __init__(self, scheduler):
+    def __init__(self, scheduler, thermostats = []):
         self.scheduler = scheduler
         self.starttime = 0
+        self.thermostats = thermostats
         self.pp = pprint.PrettyPrinter(indent=4, sort_dicts=False)
         
     def Schedule(self, API, Status, startHour = 6, startMinute = 30, duration = 30):
@@ -510,6 +534,9 @@ class deHumidify:
         #print('deHumidify.forceRun next:', self.starttime)
 
         for i in range(len(self.API.thermostats)):
+            if self.API.thermostats[i]['name'] not in self.thermostats:
+                print('VVV skipping',   self.API.thermostats[i]['name'])
+                continue
             events = [self.API.getCurrentMode(i, 0), self.API.getCurrentMode(i, 1)]
             if 'vacation' not in events[0] and 'vacation' not in events[1]:
                 print('thermostat', i, 'not running in vacation mode')
@@ -520,11 +547,16 @@ class deHumidify:
         oven   = 'smart2'
         indoorTemp  = 0.0
         outdoorHigh = 0.0
+        thermos = 0
         for i in range(len(self.API.thermostats)):
+            if self.API.thermostats[i]['name'] not in self.thermostats:
+                print('HHH skipping' , self.API.thermostats[i]['name'])
+                continue
+            thermos += 1
             indoorTemp  += self.API.thermostats[i]['runtime']['actualTemperature']
             outdoorHigh += self.API.thermostats[i]['weather']['forecasts'][0]['tempHigh']
-        indoorTemp  = indoorTemp  / 10.0 / len(self.API.thermostats)
-        outdoorHigh = outdoorHigh / 10.0 / len(self.API.thermostats)
+        indoorTemp  = indoorTemp  / 10.0 / thermos
+        outdoorHigh = outdoorHigh / 10.0 / thermos
         if indoorTemp >= 65 and outdoorHigh > 70.0:
             climate = icebox
         else:
@@ -560,6 +592,9 @@ class deHumidify:
         #self.pp.pprint(self.API.thermostats)
 
         for i in range(len(self.API.thermostats)):
+            if self.API.thermostats[i]['name'] not in self.thermostats:
+                print('CCC skipping' , self.API.thermostats[i]['name'])
+                continue
             self.API.Set_Climate_hold(index = i,
                                       climate   = climate,
                                       hold_type = 'dateTime',
@@ -580,9 +615,10 @@ def main():
     API = ecobee(config_filename = 'ecobee.conf')
     setLogging(pyecobee._LOGGER)
     API.read_config_from_file()
+    thermostats = ['Upstairs', 'Downstairs']
     # intialize API.thermostats
     API.getThermostatData()
-    save = saveEcobeeData()
+    save = saveEcobeeData(thermostats = thermostats)
  
     # Build a scheduler object that will look at absolute times
     scheduler = sched.scheduler(time.time, time.sleep)
@@ -595,12 +631,12 @@ def main():
     weather = collectThermostatData(scheduler)
     weather.Schedule(API.getWeather, save.WeatherData, API, minutes = 25)
 
-    header = Status(scheduler)
+    header = Status(scheduler, thermostats = thermostats)
     header.Schedule(API, header.printHeaderLine, minutes = 40)
-    status = Status(scheduler)
+    status = Status(scheduler, thermostats = thermostats)
     status.Schedule(API, status.printStatusLine, minutes = 3)
 
-    dehumidify = deHumidify(scheduler)
+    dehumidify = deHumidify(scheduler, thermostats = thermostats)
     dehumidify.Schedule(API, status.addLine, startHour = 6, startMinute = 30, duration = 60)
 
     ###############3 debug
