@@ -6,7 +6,7 @@ from sys import path
 path.append('/home/jim/tools/')
 from shared import getTimeInterval
 
-DBname = '/home/jim/tools/Honeywell/MBthermostat3.sql'
+#DBname = '/home/jim/tools/Honeywell/MBthermostat3.sql'
 saneUsageMax = 33.3
 #saneUsageMax = 10.0
 global insaneUsage
@@ -202,11 +202,11 @@ def makeReport(c, thermostat):
     #makeSection(c, thermostat,  'All', byDay = True)
     
 def main():
-    HoneywellDB = '/home/jim/tools/Honeywell/MBthermostat3.sql'
-    BayWebDB    = '/home/jim/tools/Honeywell/MBthermo.sql'
-    EcobeeDB    = '/home/jim/tools/Ecobee/MBthermostat.sql'
+    #HoneywellDB = '/home/jim/tools/Honeywell/MBthermostat3.sql'
+    #BayWebDB    = '/home/jim/tools/Honeywell/MBthermo.sql'
+    #EcobeeDB    = '/home/jim/tools/Ecobee/MBthermostat.sql'
     EcobeeDB    = '/home/jim/tools/Ecobee/Thermostats.sql'
-    WorkingDB   = '/home/jim/tools/Honeywell/Working.sql'
+    WorkingDB   = '/home/jim/tools/Ecobee/Working.sql'
     WorkingDB   = ':memory:'
     Create = 'CREATE TABLE IF NOT EXISTS ZZZZZZZZ (\n' +\
         ' id             INTEGER PRIMARY KEY,      \n' +\
@@ -245,7 +245,9 @@ def main():
         '         coolStatus,                              \n' +\
         '         heatStatus,                              \n' +\
         '         fanOn                                    \n' +\
-        '    FROM Edb.YYYYYYYY                             \n'
+        '    FROM Edb.YYYYYYYY                             \n' +\
+        '    ORDER BY statusTime                           \n'
+
     Insert = 'INSERT INTO ZZZZZZZZ          \n' +\
         '   ( statusTime,                   \n' +\
         '     temp,                         \n' +\
@@ -253,42 +255,6 @@ def main():
         '     heatSetpoint,                 \n' +\
         '     outputStatus,                 \n' +\
         '     fanOn)                        \n' +\
-        '  SELECT datetime AS statusTime,   \n' +\
-        '         iat      AS temp,         \n' +\
-        '         sp       AS coolSetPoint, \n' +\
-        '         NULL     AS heatSetpoint, \n' +\
-        '         NULL     as outputStatus, \n' +\
-        '         fan      AS fanOn         \n' +\
-        '    FROM Bdb.YYYYYYYY              \n' +\
-        '    WHERE mode == 2                \n' +\
-        ' UNION ALL                         \n' +\
-        '  SELECT datetime AS statusTime,   \n' +\
-        '         iat      AS temp,         \n' +\
-        '         NULL     AS coolSetPoint, \n' +\
-        '         sp       AS heatSetpoint, \n' +\
-        '         NULL     as outputStatus, \n' +\
-        '         fan      AS fanOn         \n' +\
-        '    FROM Bdb.YYYYYYYY              \n' +\
-        '    WHERE mode == 1                \n' +\
-        ' UNION ALL                         \n' +\
-        '  SELECT datetime AS statusTime,   \n' +\
-        '         iat      AS temp,         \n' +\
-        '         NULL     AS coolSetPoint, \n' +\
-        '         NULL     AS heatSetpoint, \n' +\
-        '         NULL     as outputStatus, \n' +\
-        '         fan      AS fanOn         \n' +\
-        '    FROM Bdb.YYYYYYYY              \n' +\
-        '    WHERE mode == 0                \n' +\
-        ' UNION ALL                         \n' +\
-        '  SELECT                           \n' +\
-        '     statusTime,                   \n' +\
-        '     temp,                         \n' +\
-        '     coolSetPoint,                 \n' +\
-        '     heatSetpoint,                 \n' +\
-        '     outputStatus,                 \n' +\
-        '     fanOn                         \n' +\
-        '    FROM Hdb.YYYYYYYY              \n' +\
-        ' UNION ALL                         \n' +\
         '  SELECT                           \n' +\
         '     statusTime,                   \n' +\
         '     temp,                         \n' +\
@@ -307,11 +273,11 @@ def main():
     db = sqlite3.connect(WorkingDB)
     db.row_factory = sqlite3.Row
     c = db.cursor()
-    c.execute('ATTACH DATABASE "' + HoneywellDB + '" AS Hdb')
-    c.execute('ATTACH DATABASE "' + BayWebDB    + '" AS Bdb')
+    #c.execute('ATTACH DATABASE "' + HoneywellDB + '" AS Hdb')
+    #c.execute('ATTACH DATABASE "' + BayWebDB    + '" AS Bdb')
     c.execute('ATTACH DATABASE "' + EcobeeDB    + '" AS Edb')
     
-    for thermostat in ['Upstairs', 'Downstairs']:
+    for thermostat in ['LivingRoom', 'Loft']:
         table = 'main.' + thermostat
         c.execute('DROP TABLE IF EXISTS ' + table)
         create = Create.replace('ZZZZZZZZ', table)
