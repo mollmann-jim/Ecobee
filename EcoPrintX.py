@@ -52,7 +52,7 @@ class ecobee(pyecobee.Ecobee):
             self._write_config()
         
         try:
-            rc = self.get_thermostats()
+            rc = self.getExtThermostats()
         
         except pyecobee.errors.ExpiredTokenError as e:
             #print('type is:', e.__class__.__name__)
@@ -61,9 +61,9 @@ class ecobee(pyecobee.Ecobee):
             rc = self.refresh_tokens()
             if rc:
                 self._write_config()
-                rc = self.get_thermostats()
+                rc = self.getExtThermostats()
                 if not rc:
-                    print('get_thermostats() failed again')
+                    print('getExtThermostats() failed again')
         #print('thermostats:')
         #self.pp.pprint(self.thermostats)
         
@@ -75,12 +75,13 @@ def main():
     API.read_config_from_file()
     # intialize API.thermostats
     API.getThermostatData()
-    for i in range(len(API.thermostats)):
-        del API.thermostats[i]['notificationSettings']
-        del API.thermostats[i]['program']
-        #del API.thermostats[i]['settings']
-        
-    pp.pprint(API.thermostats)
+    for i in range(len(API.thermostatsExt)):
+        #del API.thermostatsExt[i]['notificationSettings']
+        #del API.thermostatsExt[i]['program']
+        #del API.thermostatsExt[i]['settings']
+        pass
+    
+    pp.pprint(API.thermostatsExt)
 
 
 
