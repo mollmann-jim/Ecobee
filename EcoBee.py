@@ -414,14 +414,30 @@ class Status:
         self.starttime = self.starttime + self.frequency
         if reschedule:
             self.scheduler.enterabs(time.mktime(self.starttime.timetuple()), 1, self.Printer, ())
-        hdr = '{:^10s} {:^8s} {:6s} {:4s} {:4s} {:4s} {:4s} {:9s} {:9s}  {:6s} {:4s} {:4s} {:4s} {:4s} {:9s} {:9s}'
+        hdr = '{:^10s} {:^8s}' \
+            ' {:6s} {:4s} {:4s} {:4s} {:4s} {:3s} {:9s} {:9s} ' \
+            ' {:6s} {:4s} {:4s} {:4s} {:4s} {:3s} {:9s} {:9s}'
+
         line = hdr.format('Date', 'Time',
-                          'Thermo', 'Temp', 'Hum.', 'Heat', 'Cool', 'Event0', 'Event1',
-                          'Thermo', 'Temp', 'Hum.' , 'Heat', 'Cool', 'Event0', 'Event1')
+                          'Thermo', 'Temp', 'Hum.', 'Heat', 'Cool', 'Act', 'Event0', 'Event1',
+                          'Thermo', 'Temp', 'Hum.', 'Heat', 'Cool', 'Act', 'Event0', 'Event1')
         self.myPrint.Print(line + '\n')
 
     def addLine(self, note):
         self.printStatusLine(note = note, reschedule = False)
+
+    def equipmentStatus(self, i):
+        eStat = self.API.thermostats[i]['equipmentStatus']
+        stat = ''
+        eStats = ['compCool', 'heatPump', 'auxHeat', 'fan']
+        shortStats = ['C', 'H', 'A', 'F']
+        for long, short in zip(eStats, shortStats):
+            if long in eStat:
+                stat += short
+        # NC gas heat shoiws as aux
+        if 'A' in stat and 'H' not in stat:
+            stat.replace('A', 'H')
+        return stat
         
     def printStatusLine(self, note = '', reschedule = True):
         #self.dump()
@@ -431,7 +447,7 @@ class Status:
         if self.API.thermostats is None:
             # wait for initialization
             return
-        fmt = '{:^6s} {:4.1f} {:^4d} {:4.1f} {:4.1f} {:^9s} {:^9s}  '
+        fmt = '{:^6s} {:4.1f} {:^4d} {:4.1f} {:4.1f} {:^3s} {:^9s} {:^9s}  '
         fmt = '{:17s} ' + fmt + fmt + ' {:s}'
         now = dt.datetime.now().replace(microsecond = 0)
         Name = [[]]
@@ -442,6 +458,7 @@ class Status:
                 Name[i].append('   ')
         # There may be 3 or more events. E.g. vacation, climate hold, template
         myTherms = []
+        myEquipStat = []
         #self.pp.pprint(Name)
         for i in range(len(self.API.thermostats)):
             if self.API.thermostats[i]['name'] not in self.thermostats:
@@ -463,6 +480,7 @@ class Status:
                     print(i, j, Name)
                     pp = pprint.PrettyPrinter(indent=4, sort_dicts=False)
                     pp.pprint(self.API.thermostats)
+            myEquipStat.append(self.equipmentStatus((i)))
         #print('sss myTherms:', myTherms)
         (A, B) = myTherms
         #self.pp.pprint(Name)
@@ -472,6 +490,7 @@ class Status:
                           self.API.thermostats[A]['runtime']['actualHumidity'],
                           self.API.thermostats[A]['runtime']['desiredHeat'] / 10.0,
                           self.API.thermostats[A]['runtime']['desiredCool'] / 10.0,
+                          myEquipStat[0],
                           Name[A][0],
                           Name[A][1],
                           self.API.thermostats[B]['name'].replace('stairs', '').replace('Room', ''),
@@ -479,6 +498,7 @@ class Status:
                           self.API.thermostats[B]['runtime']['actualHumidity'],
                           self.API.thermostats[B]['runtime']['desiredHeat'] / 10.0,
                           self.API.thermostats[B]['runtime']['desiredCool'] / 10.0,
+                          myEquipStat[1],
                           Name[B][0],
                           Name[B][1],
                           note
@@ -713,9 +733,9 @@ def main():
 
     scheduler.run()
 
-if 'sched' in sys.argv[0]:
-    DBname  = '/home/jim/tools/Ecobee/MBthermostat.sched.sql'
-    LOGFILE = '/home/jim/tools/Ecobee/ecobee.sched.log'
+if 'New' in sys.argv[0]:
+    DBname  = '/home/jim/tools/Ecobee/Thermostats.New.sql'
+    LOGFILE = '/home/jim/tools/Ecobee/ecobee.New.log'
 else:
     DBname  = '/home/jim/tools/Ecobee/Thermostats.sql'
     LOGFILE = '/home/jim/tools/Ecobee/ecobee.log'
