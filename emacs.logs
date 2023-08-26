@@ -6,13 +6,13 @@ LOGdir="/home/jim/tools/Ecobee/logs"
 for f in $(ls -tr $LOGdir/E* | tail -3); do
     echo $f | grep -q NC
     if [[ $? -eq 0 ]]; then
-	LOC="-e 0,2862,22,968,1384"
+	LOC="-e 0,2798,22,1032,1384"
     else
 	echo $f | grep -q SC
 	if [[ $? -eq 0 ]]; then
-	    LOC="-e 0,0,22,968,1384"
+	    LOC="-e 0,0,22,1032,1384"
 	else
-	    LOC="-e 0,978,22,832,1384"
+	    LOC="-e 0,1040,22,832,1384"
 	fi
     fi
     /usr/bin/emacsclient -c +999999 $f &
