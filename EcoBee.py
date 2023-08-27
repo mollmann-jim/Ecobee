@@ -91,28 +91,34 @@ class saveEcobeeData():
                 ' holdUntil      TEXT     \n' +\
                 ' )' 
             self.c[table].execute(create)
+            index  = 'CREATE INDEX IF NOT EXISTS ' + table + 'index ON ' +\
+                table + ' (statusTime);'
+            self.c[table].execute(index)
             tableX = table + 'X'
             createX = 'CREATE TABLE IF NOT EXISTS ' + tableX + ' ( \n' +\
-                ' lastReading     TEXT, \n' +\
-                ' runtimeDate     TEXT,     \n' +\
-                ' runtimeInterval TEXT,     \n' +\
-                ' dataTime        TEXT PRIMARY KEY,     \n' +\
-                ' temperature     REAL,     \n' +\
-                ' humidity        INTEGER,  \n' +\
-                ' desiredHeat     REAL,     \n' +\
-                ' desiredCool     REAL,     \n' +\
-                ' hvacMode        TEXT,     \n' +\
-                ' heatPump1       INTEGER,  \n' +\
-                ' heatPump2       INTEGER,  \n' +\
-                ' auxHeat1        INTEGER,  \n' +\
-                ' auxHeat2        INTEGER,  \n' +\
-                ' auxHeat3        INTEGER,  \n' +\
-                ' cool1           INTEGER,  \n' +\
-                ' cool2           INTEGER,  \n' +\
-                ' fan             INTEGER   \n' +\
+                ' lastReading     TEXT,             \n' +\
+                ' runtimeDate     TEXT,             \n' +\
+                ' runtimeInterval TEXT,             \n' +\
+                ' dataTime        TEXT PRIMARY KEY, \n' +\
+                ' temperature     REAL,             \n' +\
+                ' humidity        INTEGER,          \n' +\
+                ' desiredHeat     REAL,             \n' +\
+                ' desiredCool     REAL,             \n' +\
+                ' hvacMode        TEXT,             \n' +\
+                ' heatPump1       INTEGER,          \n' +\
+                ' heatPump2       INTEGER,          \n' +\
+                ' auxHeat1        INTEGER,          \n' +\
+                ' auxHeat2        INTEGER,          \n' +\
+                ' auxHeat3        INTEGER,          \n' +\
+                ' cool1           INTEGER,          \n' +\
+                ' cool2           INTEGER,          \n' +\
+                ' fan             INTEGER           \n' +\
                 ');'
             self.c[tableX] = self.DB.cursor()
             self.c[tableX].execute(createX)
+            index  = 'CREATE INDEX IF NOT EXISTS ' + table + 'index ON ' +\
+                table + ' (dataTime);'
+            self.c[table].execute(index)
             
         createW = 'CREATE TABLE IF NOT EXISTS Weather' + self.where + ' ( \n' +\
                 ' id             INTEGER PRIMARY KEY, \n' +\
