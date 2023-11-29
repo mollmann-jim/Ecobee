@@ -27,7 +27,7 @@ while true; do
     /usr/bin/date >> $outLogNC
     /usr/bin/date >> $outLogSC
     echo '============================================================' >> $outLog
-    /home/jim/tools/Ecobee/EcoBee.py >> $outLog 2>&1 7>$outLogNC 8>$outLogSC
+    /home/jim/tools/Ecobee/EcoBee.py >> $outLog 2>&1 7>>$outLogNC 8>>$outLogSC
     sleep 5
 done
 #
