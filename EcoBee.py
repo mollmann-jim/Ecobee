@@ -74,7 +74,6 @@ class saveEcobeeData():
             #drop = 'DROP TABLE IF EXISTS ' + table + ';'
             #c[table].execute(drop)
             create = 'CREATE TABLE IF NOT EXISTS ' + table + '( \n' +\
-                ' id             INTEGER PRIMARY KEY, \n' +\
                 ' timestamp      INTEGER DEFAULT CURRENT_TIMESTAMP, \n' +\
                 ' statusTime     INTEGER, \n' +\
                 ' temp           REAL,    \n' +\
@@ -121,7 +120,6 @@ class saveEcobeeData():
             self.c[table].execute(index)
             
         createW = 'CREATE TABLE IF NOT EXISTS Weather' + self.where + ' ( \n' +\
-                ' id             INTEGER PRIMARY KEY, \n' +\
                 ' timestamp      INTEGER DEFAULT CURRENT_TIMESTAMP, \n' +\
                 ' station        TEXT,     \n' +\
                 ' weatherSymbol  TEXT,     \n' +\
@@ -151,6 +149,24 @@ class saveEcobeeData():
                               'blizzard', 'pellets', 'thunderstorm', 'windy',
                               'tornado', 'fog', 'haze', 'smoke', 'dust']
         self.sky = ['SUNNY', 'CLEAR', 'MOSTLY SUNNY', 'MOSTLY CLEAR',
+                    'HAZY SUNSHINE', 'HAZE', 'PASSING CLOUDS',
+                    'MORE SUN THAN CLOUDS', 'SCATTERED CLOUDS', 'PARTLY CLOUDY',
+                    'A MIXTURE OF SUN AND CLOUDS', 'HIGH LEVEL CLOUDS',
+                    'MORE CLOUDS THAN SUN', 'PARTLY SUNNY', 'BROKEN CLOUDS',
+                    'MOSTLY CLOUDY', 'CLOUDY', 'OVERCAST', 'LOW CLOUDS',
+                    'LIGHT FOG', 'FOG', 'DENSE FOG', 'ICE FOG', 'SANDSTORM',
+                    'DUSTSTORM', 'INCREASING CLOUDINESS', 'DECREASING CLOUDINESS',
+                    'CLEARING SKIES', 'BREAKS OF SUN LATE',
+                    'EARLY FOG FOLLOWED BY SUNNY SKIES', 'AFTERNOON CLOUDS',
+                    'MORNING CLOUDS', 'SMOKE', 'LOW LEVEL HAZE']
+        
+        self.weatherSymbol = ['no symbol', 'n/a', 'sunny', 'few clouds',
+                              'partly cloudy', 'mostly cloudy', 'overcast',
+                              'drizzle', 'rain', 'freezing rain', 'showers',
+                              'hail', 'snow', 'flurries', 'freezing snow',
+                              'blizzard', 'pellets', 'thunderstorm', 'windy',
+                              'tornado', 'fog', 'haze', 'smoke', 'dust']
+        self.sky = ['N/A', 'SUNNY', 'CLEAR', 'MOSTLY SUNNY', 'MOSTLY CLEAR',
                     'HAZY SUNSHINE', 'HAZE', 'PASSING CLOUDS',
                     'MORE SUN THAN CLOUDS', 'SCATTERED CLOUDS', 'PARTLY CLOUDY',
                     'A MIXTURE OF SUN AND CLOUDS', 'HIGH LEVEL CLOUDS',
@@ -289,12 +305,19 @@ class saveEcobeeData():
         else:
             self.prevWeather = dateTime
         symbol = API.thermostats[W]['weather']['forecasts'][0]['weatherSymbol']
-        symbol = self.weatherSymbol[symbol].title()
+        symbol += 2    # first entry is -2, offset for []
+        if symbol < 0 or symbol >= len(self.weatherSymbol):
+            symbol = None
+        else:
+            symbol = self.weatherSymbol[symbol].title()
         gust = API.thermostats[W]['weather']['forecasts'][0]['windGust']
         if gust == -5002:
             gust = None
         sky = API.thermostats[W]['weather']['forecasts'][0]['sky']
-        sky = self.sky[2 + sky].title()    #first entry is -2
+        if sky < 0 or sky >= len(self.sky):
+            sky = None
+        else:
+            sky = self.sky[sky].title() 
         values = [API.thermostats[W]['weather']['weatherStation'],
                   symbol,
                   dateTime,
@@ -716,7 +739,7 @@ def main():
     NCdehumidify = deHumidify(scheduler, thermostats = NCthermostats, where = 'NC')
     SCdehumidify = deHumidify(scheduler, thermostats = SCthermostats, where = 'SC')
     NCdehumidify.Schedule(API, NCstatus.addLine, startHour = 6, startMinute = 30, duration = 60)
-    SCdehumidify.Schedule(API, SCstatus.addLine, startHour = 6, startMinute = 30, duration = 60)
+    SCdehumidify.Schedule(API, SCstatus.addLine, startHour = 6, startMinute = 45, duration = 60)
 
     ###############3 debug
     '''
