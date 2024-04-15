@@ -75,11 +75,16 @@ def main():
     API.read_config_from_file()
     # intialize API.thermostats
     API.getThermostatData()
-    for i in range(len(API.thermostats)):
-        del API.thermostats[i]['notificationSettings']
-        del API.thermostats[i]['program']
-        #del API.thermostats[i]['settings']
-        
+    for i in reversed(range(len(API.thermostats))):
+        if API.thermostats[i]['name'] != 'Downstairs':
+            del API.thermostats[i]
+        else:
+            del API.thermostats[i]['notificationSettings']
+            del API.thermostats[i]['program']
+            del API.thermostats[i]['settings']
+            del API.thermostats[i]['runtime']
+            del API.thermostats[i]['weather']
+            del API.thermostats[i]['remoteSensors']
     pp.pprint(API.thermostats)
 
 
