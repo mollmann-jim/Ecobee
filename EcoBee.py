@@ -803,12 +803,12 @@ def main():
     host = os.getenv('HOSTNAME')
     if host == 'jim4':
         NCdehumidify.Schedule(API, NCstatus.addLine, startHour = 6, startMinute = 30, duration = 60)
-        SCdehumidify.Schedule(API, SCstatus.addLine, startHour = 6, startMinute = 45, duration = 60)
+        SCdehumidify.Schedule(API, SCstatus.addLine, startHour = 4, startMinute = 45, duration = 60)
     else:
         # if not tunning at "home", set start 5 minutes later
         # should allow home to disable vacation mode, if it is running
         NCdehumidify.Schedule(API, NCstatus.addLine, startHour = 6, startMinute = 35, duration = 60)
-        SCdehumidify.Schedule(API, SCstatus.addLine, startHour = 6, startMinute = 50, duration = 60)
+        SCdehumidify.Schedule(API, SCstatus.addLine, startHour = 4, startMinute = 50, duration = 60)
     ###############3 debug
     '''
     DH = dt.datetime.now().replace(microsecond = 0) + dt.timedelta(minutes = 10)
