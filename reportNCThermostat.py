@@ -172,6 +172,8 @@ def makeReport(c, thermostat, table):
     makeSection(c, thermostat, table, 'Today')
     makeSection(c, thermostat, table, 'Prev7days', byDay = True)
     printHeader()
+    makeSection(c, thermostat, table, 'Prev7daysLastYear', byDay = True)
+    printHeader()
     for period in ['This Week', 'Last Week', 'This Month', 'Last Month']:
         makeSection(c, thermostat, table, period)
     for period in ['This Month', 'Last Month']:
