@@ -660,7 +660,7 @@ class deHumidify:
             if self.API.thermostats[i]['name'] not in self.thermostats:
                 continue
             events = [self.API.getCurrentMode(i, 0), self.API.getCurrentMode(i, 1)]
-            if 'vacation' not in events[0] and 'vacation' not in events[1]:
+            if '*vacation' not in events[0] and '*vacation' not in events[1]:
                 print('thermostat', i, self.API.thermostats[i]['name'],
                       'not running in vacation mode')
                 print(events)
