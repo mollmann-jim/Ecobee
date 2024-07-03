@@ -91,7 +91,10 @@ class fdPrint:
     def Print(self, line):
         myLine = str.encode(line)
         os.write(self.fd, myLine)
-        os.fsync(self.fd)
+        if os.isatty(self.fd):
+            pass
+        else:
+            os.fsync(self.fd)
         
         
 class saveEcobeeData():
@@ -750,7 +753,81 @@ class deHumidify:
         for i in Thermos:
             self.pp.pprint(self.API.thermostats[i]['name'])
             self.pp.pprint(self.API.thermostats[i]['events'])
+
+class TimeOfUse:
+    def __init__(self, scheduler, thermostats = [], printer = None):
+        self.scheduler   = scheduler
+        self.thermostats = thermostats
+        self.myPrint     = printer
+
+    def setDates(self, startMonth = 1, startDay = 2, endMonth = 3, endDay = 4):
+        self.startMonth = startMonth
+        self.startDay   = startDay
+        self.endMonth   = endMonth
+        self.endDay     = endDay
+        print('TimeOfUse.setDates', startMonth, startDay, endMonth, endDay)
         
+    def setFirst(self, startHour, startMinute, modeSet, mode = None):
+        now = dt.datetime.now()
+        firstTime = now.replace(hour = startHour, minute = startMinute,
+                                second = 0, microsecond = 0) - dt.timedelta(days = 1)
+        while firstTime < now:
+            firstTime += dt.timedelta(days = 1)
+        self.scheduler.enterabs(time.mktime(firstTime.timetuple()), 1, modeSet, ())
+        if mode == 'auto':
+            print('auto', firstTime)
+            self.autoTime = firstTime
+        elif mode == 'off':
+            print('off', firstTime)
+            self.offTime = firstTime
+        else:
+            print('TimeOfUse.setFirst unknow mode', mode)
+
+    def checkActive(self):
+        now = dt.datetime.now()
+        startTime = dt.datetime(now.year, self.startMonth, self.startDay)
+        endTime   = dt.datetime(now.year, self.endtMonth,  self.endDay) + \
+            dt.timedelta(days =1, microseconds = -1)
+        print('checkActive', startTime, endTime, now)
+        if endTime < startTime:
+            endTime += dt.timedelta(years = 1)
+            print('checkActive', startTime, endTime, now)
+        if now > startTime and now < endTime:
+            print('Active')
+            return True
+        else:
+            print('InActive')
+            return False
+
+    def modeOff(self):
+        print('modeOff')
+        if not self.checkActive:
+            return
+        self.offTime += dt.timedelta(days = 1)
+        self.scheduler.enterabs(time.mktime(self.offTime.timetuple()), 1, self.modeOff, ())
+        for thermostat in self.thermostats:
+            self.setMode('off', thermostat)
+
+    def modeAuto(self):
+        print('modeAuto')
+        if not self.checkActive:
+            return
+        self.autoTime += dt.timedelta(days = 1)
+        self.scheduler.enterabs(time.mktime(self.offTime.timetuple()), 1, self.modeAuto, ())
+        for thermostat in self.thermostats:
+            self.setMode('auto', thermostat)
+
+    def Schedule(self, API, offHour = 15, offMinute = 0, autoHour = 18, autoMinute = 0):
+        self.API = API
+        self.setFirst(offHour,  offMinute,  self.modeOff,  mode = 'off' )
+        self.setFirst(autoHour, autoMinute, self.modeAuto, mode = 'auto')
+
+    def setMode(self, mode, thermostat):
+        print('setMode', mode, thermostat)
+        for i in range(len(self.API.thermostats)):
+            if self.API.thermostats[i]['name'] in self.thermostats:
+                self.API.set_hvac_mode(i, mode)
+
         
 def main():
     pp = pprint.PrettyPrinter(indent=4, sort_dicts=False)
@@ -771,8 +848,8 @@ def main():
 
     NCruntime = collectThermostatData(scheduler)
     SCruntime = collectThermostatData(scheduler)
-    NCruntime.Schedule(API.getThermostatData, NCsave.ThermostatData, API, minutes = 2, seconds = 45)
-    SCruntime.Schedule(API.getThermostatData, SCsave.ThermostatData, API, minutes = 2, seconds = 45)
+    NCruntime.Schedule(API.getThermostatData, NCsave.ThermostatData, API, minutes = 12, seconds = 45)
+    SCruntime.Schedule(API.getThermostatData, SCsave.ThermostatData, API, minutes = 12, seconds = 45)
     
     NCextRuntime = collectThermostatData(scheduler)
     SCextRuntime = collectThermostatData(scheduler)
@@ -795,11 +872,12 @@ def main():
 
     NCstatus = Status(scheduler, thermostats = NCthermostats, printer = NCprint)
     SCstatus = Status(scheduler, thermostats = SCthermostats, printer = SCprint)
-    NCstatus.Schedule(API, NCstatus.printStatusLine, minutes = 3)
-    SCstatus.Schedule(API, SCstatus.printStatusLine, minutes = 3)
+    NCstatus.Schedule(API, NCstatus.printStatusLine, minutes = 33)
+    SCstatus.Schedule(API, SCstatus.printStatusLine, minutes = 30)
 
     NCdehumidify = deHumidify(scheduler, thermostats = NCthermostats, where = 'NC')
     SCdehumidify = deHumidify(scheduler, thermostats = SCthermostats, where = 'SC')
+
     host = os.getenv('HOSTNAME')
     if host == 'jim4':
         NCdehumidify.Schedule(API, NCstatus.addLine, startHour = 6, startMinute = 30, duration = 60)
@@ -809,6 +887,15 @@ def main():
         # should allow home to disable vacation mode, if it is running
         NCdehumidify.Schedule(API, NCstatus.addLine, startHour = 6, startMinute = 35, duration = 60)
         SCdehumidify.Schedule(API, SCstatus.addLine, startHour = 4, startMinute = 50, duration = 60)
+    
+    SCTimeOfUseSummer = TimeOfUse(scheduler, thermostats = SCthermostats, printer = SCprint)
+    SCTimeOfUseSummer.setDates(startMonth = 6, startDay = 1, endMonth = 9, endDay = 30)
+    #SCTimeOfUseSummer.Schedule(API, offHour = 15, offMinute = 0, autoHour = 18, autoMinute = 0)
+    S = E = dt.datetime.now()
+    S = S + dt.timedelta(minutes = 2)
+    E = E + dt.timedelta(minutes = 17)
+    SCTimeOfUseSummer.Schedule(API, offHour = S.hour , offMinute = S.minute , autoHour = E.hour , autoMinute = E.minute)
+
     ###############3 debug
     '''
     DH = dt.datetime.now().replace(microsecond = 0) + dt.timedelta(minutes = 10)
@@ -831,11 +918,11 @@ def main():
     scheduler.run()
 
 if 'New' in sys.argv[0]:
-    DBname  = '/home/jim/tools/Ecobee/Thermostats.New.sql'
-    LOGFILE = '/home/jim/tools/Ecobee/ecobee.New.log'
+    DBname  = '/home/jim/tools/Ecobee.Time.of.Use/Thermostats.New.sql'
+    LOGFILE = '/home/jim/tools/Ecobee.Time.of.Use/ecobee.New.log'
 else:
-    DBname  = '/home/jim/tools/Ecobee/Thermostats.sql'
-    LOGFILE = '/home/jim/tools/Ecobee/ecobee.log'
+    DBname  = '/home/jim/tools/Ecobee.Time.of.Use/Thermostats.sql'
+    LOGFILE = '/home/jim/tools/Ecobee.Time.of.Use/ecobee.log'
 
 if __name__ == '__main__':
     # want unbuffered stdout for use with "tee"
