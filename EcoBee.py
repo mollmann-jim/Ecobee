@@ -823,7 +823,7 @@ class TimeOfUse:
         self.setFirst(autoHour, autoMinute, self.modeAuto, mode = 'auto')
 
     def setMode(self, mode, thermostat):
-        print('setMode', mode, thermostat)
+        print('setMode', mode, thermostat, dt.datetime.now())
         for i in range(len(self.API.thermostats)):
             if self.API.thermostats[i]['name'] in self.thermostats:
                 self.API.set_hvac_mode(i, mode)
@@ -890,11 +890,11 @@ def main():
     
     SCTimeOfUseSummer = TimeOfUse(scheduler, thermostats = SCthermostats, printer = SCprint)
     SCTimeOfUseSummer.setDates(startMonth = 6, startDay = 1, endMonth = 9, endDay = 30)
-    #SCTimeOfUseSummer.Schedule(API, offHour = 15, offMinute = 0, autoHour = 18, autoMinute = 0)
+    SCTimeOfUseSummer.Schedule(API, offHour = 15, offMinute = 0, autoHour = 18, autoMinute = 0)
     S = E = dt.datetime.now()
     S = S + dt.timedelta(minutes = 2)
-    E = E + dt.timedelta(minutes = 17)
-    SCTimeOfUseSummer.Schedule(API, offHour = S.hour , offMinute = S.minute , autoHour = E.hour , autoMinute = E.minute)
+    E = E + dt.timedelta(minutes = 180)
+    #SCTimeOfUseSummer.Schedule(API, offHour = S.hour , offMinute = S.minute , autoHour = E.hour , autoMinute = E.minute)
 
     ###############3 debug
     '''
