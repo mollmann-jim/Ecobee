@@ -779,8 +779,8 @@ class TimeOfUse:
         if mode == self.modeNormal:
             print('Normal', firstTime)
             self.normalTime = firstTime
-        elif mode == 'off':
-            print('off', firstTime)
+        elif mode == self.modeOff:
+            print(self.modeOff, firstTime)
             self.offTime = firstTime
         else:
             print('TimeOfUse.setFirst unknow mode', mode)
@@ -808,7 +808,7 @@ class TimeOfUse:
         self.offTime += dt.timedelta(days = 1)
         self.scheduler.enterabs(time.mktime(self.offTime.timetuple()), 1, self.setModeOff, ())
         for thermostat in self.thermostats:
-            self.setMode('off', thermostat)
+            self.setMode(self.modeOff, thermostat)
 
     def setModeNormal(self):
         print('setModeNormal')
@@ -821,8 +821,8 @@ class TimeOfUse:
 
     def Schedule(self, API, offHour = 15, offMinute = 0, normalHour = 18, normalMinute = 0):
         self.API = API
-        self.setFirst(offHour,    offMinute,    self.setModeOff,    mode = 'off' )
-        self.setFirst(normalHour, normalMinute, self.setModeNormal, mode = None)
+        self.setFirst(offHour,    offMinute,    self.setModeOff,    mode = self.modeOff )
+        self.setFirst(normalHour, normalMinute, self.setModeNormal, mode = self.modeNormal)
 
     def setMode(self, mode, thermostat):
         print('setMode', mode, thermostat, dt.datetime.now())
