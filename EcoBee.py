@@ -760,7 +760,7 @@ class TimeOfUse:
         self.thermostats = thermostats
         self.myPrint     = printer
         self.modeOff     = 'off'
-        self.modeNormal  = None
+        self.modeNormal  = []
 
     def setDates(self, startMonth = 1, startDay = 2, endMonth = 3, endDay = 4):
         self.startMonth = startMonth
@@ -776,24 +776,24 @@ class TimeOfUse:
         while firstTime < now:
             firstTime += dt.timedelta(days = 1)
         self.scheduler.enterabs(time.mktime(firstTime.timetuple()), 1, modeSet, ())
-        if mode == self.modeNormal:
-            print('Normal', firstTime)
+        if mode == 'normal':
+            print('setFirst:Normal', self.modeNormal, firstTime)
             self.normalTime = firstTime
-        elif mode == self.modeOff:
-            print(self.modeOff, firstTime)
+        elif mode == 'off':
+            print('setFirst:off:', self.modeOff, firstTime)
             self.offTime = firstTime
         else:
             print('TimeOfUse.setFirst unknow mode', mode)
 
-    def checkActive(self):
+    def checkActiveSeason(self):
         now = dt.datetime.now()
         startTime = dt.datetime(now.year, self.startMonth, self.startDay)
         endTime   = dt.datetime(now.year, self.endtMonth,  self.endDay) + \
             dt.timedelta(days =1, microseconds = -1)
-        print('checkActive', startTime, endTime, now)
+        print('checkActiveSeason', startTime, endTime, now)
         if endTime < startTime:
             endTime += dt.timedelta(years = 1)
-            print('checkActive', startTime, endTime, now)
+            print('checkActiveSeason', startTime, endTime, now)
         if now > startTime and now < endTime:
             print('Active')
             return True
@@ -803,7 +803,7 @@ class TimeOfUse:
 
     def setModeOff(self):
         print('setModeOff')
-        if not self.checkActive:
+        if not self.checkActiveSeason():
             return
         self.offTime += dt.timedelta(days = 1)
         self.scheduler.enterabs(time.mktime(self.offTime.timetuple()), 1, self.setModeOff, ())
@@ -812,23 +812,35 @@ class TimeOfUse:
 
     def setModeNormal(self):
         print('setModeNormal')
-        if not self.checkActive:
+        if not self.checkActiveSeason():
             return
         self.normalTime += dt.timedelta(days = 1)
         self.scheduler.enterabs(time.mktime(self.offTime.timetuple()), 1, self.setModeNormal, ())
-        for thermostat in self.thermostats:
-            self.setMode(self.modeNormal, thermostat)
+        self.getNormalMode()    # get current "normal" modes
+        for i in range(len(self.API.thermostats)):
+            if self.API.thermostats[i]['name'] in self.thermostats:
+                self.setMode(self.modeNormal[i], thermostat)
 
     def Schedule(self, API, offHour = 15, offMinute = 0, normalHour = 18, normalMinute = 0):
         self.API = API
-        self.setFirst(offHour,    offMinute,    self.setModeOff,    mode = self.modeOff )
-        self.setFirst(normalHour, normalMinute, self.setModeNormal, mode = self.modeNormal)
+        self.setFirst(offHour,    offMinute,    self.setModeOff,    mode = 'off')
+        self.setFirst(normalHour, normalMinute, self.setModeNormal, mode = 'normal')
+        self.getNormalMode()
 
     def setMode(self, mode, thermostat):
         print('setMode', mode, thermostat, dt.datetime.now())
         for i in range(len(self.API.thermostats)):
             if self.API.thermostats[i]['name'] in self.thermostats:
                 self.API.set_hvac_mode(i, mode)
+
+    def getNormalMode(self):
+        modes = []
+        for i in range(len(self.API.thermostats)):
+            modes.append(None)
+            if self.API.thermostats[i]['name'] in self.thermostats:
+                modes[i] = self.API.thermostats[i]['settings']['hvacMode']
+        self.modeNormal = modes
+        print('getNormalMode', modes, self.modeNormal)
 
         
 def main():
