@@ -759,6 +759,8 @@ class TimeOfUse:
         self.scheduler   = scheduler
         self.thermostats = thermostats
         self.myPrint     = printer
+        self.modeOff     = 'off'
+        self.modeNormal  = None
 
     def setDates(self, startMonth = 1, startDay = 2, endMonth = 3, endDay = 4):
         self.startMonth = startMonth
@@ -774,9 +776,9 @@ class TimeOfUse:
         while firstTime < now:
             firstTime += dt.timedelta(days = 1)
         self.scheduler.enterabs(time.mktime(firstTime.timetuple()), 1, modeSet, ())
-        if mode == 'auto':
-            print('auto', firstTime)
-            self.autoTime = firstTime
+        if mode == self.modeNormal:
+            print('Normal', firstTime)
+            self.normalTime = firstTime
         elif mode == 'off':
             print('off', firstTime)
             self.offTime = firstTime
@@ -799,28 +801,28 @@ class TimeOfUse:
             print('InActive')
             return False
 
-    def modeOff(self):
-        print('modeOff')
+    def setModeOff(self):
+        print('setModeOff')
         if not self.checkActive:
             return
         self.offTime += dt.timedelta(days = 1)
-        self.scheduler.enterabs(time.mktime(self.offTime.timetuple()), 1, self.modeOff, ())
+        self.scheduler.enterabs(time.mktime(self.offTime.timetuple()), 1, self.setModeOff, ())
         for thermostat in self.thermostats:
             self.setMode('off', thermostat)
 
-    def modeAuto(self):
-        print('modeAuto')
+    def setModeNormal(self):
+        print('setModeNormal')
         if not self.checkActive:
             return
-        self.autoTime += dt.timedelta(days = 1)
-        self.scheduler.enterabs(time.mktime(self.offTime.timetuple()), 1, self.modeAuto, ())
+        self.normalTime += dt.timedelta(days = 1)
+        self.scheduler.enterabs(time.mktime(self.offTime.timetuple()), 1, self.setModeNormal, ())
         for thermostat in self.thermostats:
-            self.setMode('auto', thermostat)
+            self.setMode(self.modeNormal, thermostat)
 
-    def Schedule(self, API, offHour = 15, offMinute = 0, autoHour = 18, autoMinute = 0):
+    def Schedule(self, API, offHour = 15, offMinute = 0, normalHour = 18, normalMinute = 0):
         self.API = API
-        self.setFirst(offHour,  offMinute,  self.modeOff,  mode = 'off' )
-        self.setFirst(autoHour, autoMinute, self.modeAuto, mode = 'auto')
+        self.setFirst(offHour,    offMinute,    self.setModeOff,    mode = 'off' )
+        self.setFirst(normalHour, normalMinute, self.setModeNormal, mode = None)
 
     def setMode(self, mode, thermostat):
         print('setMode', mode, thermostat, dt.datetime.now())
@@ -890,11 +892,11 @@ def main():
     
     SCTimeOfUseSummer = TimeOfUse(scheduler, thermostats = SCthermostats, printer = SCprint)
     SCTimeOfUseSummer.setDates(startMonth = 6, startDay = 1, endMonth = 9, endDay = 30)
-    SCTimeOfUseSummer.Schedule(API, offHour = 15, offMinute = 0, autoHour = 18, autoMinute = 0)
+    SCTimeOfUseSummer.Schedule(API, offHour = 15, offMinute = 0, normalHour = 18, normalMinute = 0)
     S = E = dt.datetime.now()
     S = S + dt.timedelta(minutes = 2)
     E = E + dt.timedelta(minutes = 180)
-    #SCTimeOfUseSummer.Schedule(API, offHour = S.hour , offMinute = S.minute , autoHour = E.hour , autoMinute = E.minute)
+    #SCTimeOfUseSummer.Schedule(API, offHour = S.hour , offMinute = S.minute , normalHour = E.hour , normalMinute = E.minute)
 
     ###############3 debug
     '''
