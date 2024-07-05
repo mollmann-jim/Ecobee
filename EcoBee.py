@@ -788,22 +788,39 @@ class TimeOfUse:
     def checkActiveSeason(self):
         now = dt.datetime.now()
         startTime = dt.datetime(now.year, self.startMonth, self.startDay)
-        endTime   = dt.datetime(now.year, self.endtMonth,  self.endDay) + \
-            dt.timedelta(days =1, microseconds = -1)
+        endTime   = dt.datetime(now.year, self.endMonth,   self.endDay) - \
+            dt.timedelta(minutes = 2)
         print('checkActiveSeason', startTime, endTime, now)
         if endTime < startTime:
             endTime += dt.timedelta(years = 1)
             print('checkActiveSeason', startTime, endTime, now)
-        if now > startTime and now < endTime:
+        if startTime <= now <= endTime:
             print('Active')
             return True
         else:
             print('InActive')
             return False
 
+    def checkActiveOffTime(self):
+        now = dt.datetime.now()
+        startTime = dt.datetime(now.year, now.month, now.day, \
+                                hour = self.offHour,    minute = self.offMinute)
+        endTime   = dt.datetime(now.year, now.month, now.day, \
+                                hour = self.normalHour, minute = self.normalMinute) - \
+                                dt.timedelta(minutes = 2)
+        print('checkActiveOffTime', startTime, endTime, now, now > startTime, now < endTime)
+        if startTime <= now <= endTime:
+            print('checkActiveOffTime: True')
+            return True
+        else:
+            print('checkActiveOffTime: False')
+            return False
+
     def setModeOff(self):
         print('setModeOff')
         if not self.checkActiveSeason():
+            return
+        if not self.checkActiveOffTime():
             return
         self.offTime += dt.timedelta(days = 1)
         self.scheduler.enterabs(time.mktime(self.offTime.timetuple()), 1, self.setModeOff, ())
@@ -822,10 +839,15 @@ class TimeOfUse:
                 self.setMode(self.modeNormal[i], thermostat)
 
     def Schedule(self, API, offHour = 15, offMinute = 0, normalHour = 18, normalMinute = 0):
+        self.offHour      = offHour
+        self.offMinute    = offMinute
+        self.normalHour   = normalHour
+        self.normalMinute = normalMinute
         self.API = API
         self.setFirst(offHour,    offMinute,    self.setModeOff,    mode = 'off')
         self.setFirst(normalHour, normalMinute, self.setModeNormal, mode = 'normal')
         self.getNormalMode()
+        self.setModeOff()     # set "off" - check first
 
     def setMode(self, mode, thermostat):
         print('setMode', mode, thermostat, dt.datetime.now())
