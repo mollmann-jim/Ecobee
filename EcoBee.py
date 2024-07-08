@@ -95,10 +95,36 @@ class fdPrint:
             pass
         else:
             os.fsync(self.fd)
+
+class normalTermostatModes:
+    def  __init__(self):
+        self.savedHVACmodes = {}
+        self.currentHVACmodes = {}
         
+    def current(self, thermostat, mode):
+        #print('normalTermostatModes:current', thermostat, mode)
+        self.currentHVACmodes[thermostat] = mode
+
+    def update(self, Saver):
+        for thermostat in self.currentHVACmodes:
+            curMode = self.currentHVACmodes[thermostat]
+            savMode = self.savedHVACmodes.get(thermostat, None)
+            if curMode == 'off' or curMode == None or curMode == savMode:
+                pass
+            else:
+                Saver(thermostat, curMode)
+                print('normalTermostatModes:update', thermostat, savMode, '->', curMode)
+                self.savedHVACmodes[thermostat] = curMode
+
+    def get(self):
+        return self.savedHVACmodes
+
+    def getSaved(self, DBgetSaved):
+        self.savedHVACmodes = DBgetSaved()
+        print('normalTermostatModes:getSaved', self.savedHVACmodes)
         
 class saveEcobeeData():
-    def __init__(self, thermostats = [], where = 'noWhere'):
+    def __init__(self, HVACmode, thermostats = [], where = 'noWhere'):
         global DBname
         self.prevStatusTime = [0, 0, 0, 0]
         #DBname = '/home/jim/tools/Ecobee/MBthermostat.sched.sql'
@@ -109,6 +135,7 @@ class saveEcobeeData():
         self.c = {}
         self.initDB()
         self.prevWeather = 0
+        self.normalModes = HVACmode
         self.pp = pprint.PrettyPrinter(indent=4, sort_dicts=False)
         
     def initDB(self):
@@ -220,6 +247,16 @@ class saveEcobeeData():
                     'CLEARING SKIES', 'BREAKS OF SUN LATE',
                     'EARLY FOG FOLLOWED BY SUNNY SKIES', 'AFTERNOON CLOUDS',
                     'MORNING CLOUDS', 'SMOKE', 'LOW LEVEL HAZE']
+
+        self.c['HVACmode'] = self.DB.cursor()
+        #drop = 'DROP TABLE IF EXISTS HVACmode;'
+        #self.c['HVACmode'].execute(drop)
+        create = 'CREATE TABLE IF NOT EXISTS HVACmode ( \n' +\
+            ' thermostat TEXT PRIMARY KEY, \n' +\
+            ' HVACmode   TEXT,    \n' +\
+            ' timestamp  INTEGER \n' +\
+            ' );'
+        self.c['HVACmode'].execute(create)
         
     def ExtRuntimeData(self, API):
         #print(dt.datetime.now(), 'save.ExtRuntimeData')
@@ -278,6 +315,7 @@ class saveEcobeeData():
                   API.thermostats[i]['name'])
             '''
             #print('ZZZ name:',  API.thermostats[i]['name'], i)
+            self.normalModes.current(API.thermostats[i]['name'], API.thermostats[i]['settings']['hvacMode'])
             if API.thermostats[i]['name'] not in self.thermostats:
                 #print('ZZZ skipping')
                 continue
@@ -324,6 +362,28 @@ class saveEcobeeData():
                       holdUntil]
             self.c[table].execute(insert, values)
             self.DB.commit()
+        self.normalModes.update(self.saveHVACmode)
+
+    def saveHVACmode(self, thermostat, mode):
+        now = dt.datetime.now()
+        insert = 'INSERT OR REPLACE INTO HVACmode' +\
+            ' (thermostat, HVACmode, timestamp)' +\
+            ' VALUES( ?, ?, ? );'
+        values = (thermostat, mode, now)
+        self.c['HVACmode'].execute(insert, values)
+        print('saveHVACmode update:', thermostat, mode, now)
+        self.DB.commit()
+
+    def getSavedHVACmodes(self):
+        modes = {}
+        select = 'SELECT thermostat, HVACmode, timestamp FROM HVACmode;'
+        self.c['HVACmode'].execute(select)
+        result = self.c['HVACmode'].fetchall()
+        for rec in result:
+            print(rec['thermostat'], rec['HVACmode'], rec['timestamp'])
+            modes[rec['thermostat']] = rec['HVACmode']
+        print('getSavedHVACmodes', modes)
+        return modes
 
     def WeatherData(self, API):
         #print(dt.datetime.now(), 'save.WeatherData')
@@ -755,10 +815,11 @@ class deHumidify:
             self.pp.pprint(self.API.thermostats[i]['events'])
 
 class TimeOfUse:
-    def __init__(self, scheduler, thermostats = [], printer = None):
+    def __init__(self, scheduler, HVACnode, thermostats = [], printer = None):
         self.scheduler   = scheduler
         self.thermostats = thermostats
         self.myPrint     = printer
+        self.normalModes = HVACnode
         self.modeOff     = 'off'
         self.modeNormal  = []
 
@@ -824,8 +885,9 @@ class TimeOfUse:
             return
         self.offTime += dt.timedelta(days = 1)
         self.scheduler.enterabs(time.mktime(self.offTime.timetuple()), 1, self.setModeOff, ())
-        for thermostat in self.thermostats:
-            self.setMode(self.modeOff, thermostat)
+        for i in range(len(self.API.thermostats)):
+            if self.API.thermostats[i]['name'] in self.thermostats:
+                self.setMode(self.modeOff, i)
 
     def setModeNormal(self):
         print('setModeNormal')
@@ -833,10 +895,14 @@ class TimeOfUse:
             return
         self.normalTime += dt.timedelta(days = 1)
         self.scheduler.enterabs(time.mktime(self.offTime.timetuple()), 1, self.setModeNormal, ())
-        self.getNormalMode()    # get current "normal" modes
+        modes = self.normalModes.get()
         for i in range(len(self.API.thermostats)):
             if self.API.thermostats[i]['name'] in self.thermostats:
-                self.setMode(self.modeNormal[i], thermostat)
+                mode = modes.get(self.API.thermostats[i]['name'], None)
+                if mode is not None:
+                    self.setMode(mode, i)
+                else:
+                    print('setModeNormal', self.API.thermostats[i]['name'], 'not found', modes)
 
     def Schedule(self, API, offHour = 15, offMinute = 0, normalHour = 18, normalMinute = 0):
         self.offHour      = offHour
@@ -846,24 +912,12 @@ class TimeOfUse:
         self.API = API
         self.setFirst(offHour,    offMinute,    self.setModeOff,    mode = 'off')
         self.setFirst(normalHour, normalMinute, self.setModeNormal, mode = 'normal')
-        self.getNormalMode()
+        #self.getNormalMode()
         self.setModeOff()     # set "off" - check first
 
-    def setMode(self, mode, thermostat):
-        print('setMode', mode, thermostat, dt.datetime.now())
-        for i in range(len(self.API.thermostats)):
-            if self.API.thermostats[i]['name'] in self.thermostats:
-                self.API.set_hvac_mode(i, mode)
-
-    def getNormalMode(self):
-        modes = []
-        for i in range(len(self.API.thermostats)):
-            modes.append(None)
-            if self.API.thermostats[i]['name'] in self.thermostats:
-                modes[i] = self.API.thermostats[i]['settings']['hvacMode']
-        self.modeNormal = modes
-        print('getNormalMode', modes, self.modeNormal)
-
+    def setMode(self, mode, i):
+        print('setMode', mode, i, self.API.thermostats[i]['name'], dt.datetime.now())
+        self.API.set_hvac_mode(i, mode)
         
 def main():
     pp = pprint.PrettyPrinter(indent=4, sort_dicts=False)
@@ -876,8 +930,10 @@ def main():
     SCthermostats = ['Upstairs', 'Downstairs']
     # intialize API.thermostats
     API.getThermostatData()
-    NCsave = saveEcobeeData(thermostats = NCthermostats, where = 'NC')
-    SCsave = saveEcobeeData(thermostats = SCthermostats, where = 'SC')
+    HVAComde = normalTermostatModes()
+    NCsave = saveEcobeeData(HVAComde, thermostats = NCthermostats, where = 'NC')
+    SCsave = saveEcobeeData(HVAComde, thermostats = SCthermostats, where = 'SC')
+    HVAComde.getSaved(SCsave.getSavedHVACmodes)
 
     # Build a scheduler object that will look at absolute times
     scheduler = sched.scheduler(time.time, time.sleep)
@@ -885,7 +941,7 @@ def main():
     NCruntime = collectThermostatData(scheduler)
     SCruntime = collectThermostatData(scheduler)
     NCruntime.Schedule(API.getThermostatData, NCsave.ThermostatData, API, minutes = 12, seconds = 45)
-    SCruntime.Schedule(API.getThermostatData, SCsave.ThermostatData, API, minutes = 12, seconds = 45)
+    SCruntime.Schedule(API.getThermostatData, SCsave.ThermostatData, API, minutes = 7, seconds = 45)
     
     NCextRuntime = collectThermostatData(scheduler)
     SCextRuntime = collectThermostatData(scheduler)
@@ -924,13 +980,15 @@ def main():
         NCdehumidify.Schedule(API, NCstatus.addLine, startHour = 6, startMinute = 35, duration = 60)
         SCdehumidify.Schedule(API, SCstatus.addLine, startHour = 4, startMinute = 50, duration = 60)
     
-    SCTimeOfUseSummer = TimeOfUse(scheduler, thermostats = SCthermostats, printer = SCprint)
+    SCTimeOfUseSummer = TimeOfUse(scheduler, HVAComde, thermostats = SCthermostats, printer = SCprint)
     SCTimeOfUseSummer.setDates(startMonth = 6, startDay = 1, endMonth = 9, endDay = 30)
-    SCTimeOfUseSummer.Schedule(API, offHour = 15, offMinute = 0, normalHour = 18, normalMinute = 0)
-    S = E = dt.datetime.now()
-    S = S + dt.timedelta(minutes = 2)
-    E = E + dt.timedelta(minutes = 180)
-    #SCTimeOfUseSummer.Schedule(API, offHour = S.hour , offMinute = S.minute , normalHour = E.hour , normalMinute = E.minute)
+    if True:
+        SCTimeOfUseSummer.Schedule(API, offHour = 15, offMinute = 0, normalHour = 18, normalMinute = 0)
+    else:
+        S = E = dt.datetime.now()
+        S = S + dt.timedelta(minutes = 5)
+        E = E + dt.timedelta(minutes = 20)
+        SCTimeOfUseSummer.Schedule(API, offHour = S.hour , offMinute = S.minute , normalHour = E.hour , normalMinute = E.minute)
 
     ###############3 debug
     '''
