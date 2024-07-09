@@ -443,6 +443,9 @@ class saveEcobeeData():
     
             
 class ecobee(pyecobee.Ecobee):
+    lastThermostats    = dt.datetime(2000, 1, 1)
+    lastExtThermostats = dt.datetime(2000, 1, 1)
+
     def __init__(self,  config_filename: str = None, config: dict = None):
         pyecobee.Ecobee.__init__(self, config_filename = config_filename, config = config)
         self.pp = pprint.PrettyPrinter(indent=4, sort_dicts=False)
@@ -460,8 +463,19 @@ class ecobee(pyecobee.Ecobee):
                 time.sleep(delay)
         return False
 
-    def getThermostatData(self):
+    def getThermostatData(self, frequency):
         #print(dt.datetime.now(), 'getThermostatData')
+
+        now = dt.datetime.now()
+        elapsed = now - ecobee.lastThermostats
+        print('ecobee:getThermostatData', now, ecobee.lastThermostats, elapsed, frequency)
+        if elapsed > frequency:
+            ecobee.lastThermostats = now
+            print('ecobee:getThermostatData - collect')
+        else:
+            print('ecobee:getThermostatData - skipping')
+            return
+
         if self.access_token is None:
             rc = self.request_pin()
             print('request pin:', rc, ' PIN:', self.pin)
@@ -485,6 +499,18 @@ class ecobee(pyecobee.Ecobee):
                     print('get_thermostats() failed again')
         #print('thermostats:')
         #self.pp.pprint(self.thermostats)
+
+    def getExtThermostatData(self, frequency):
+        now = dt.datetime.now()
+        elapsed = now - ecobee.lastExtThermostats
+        print('ecobee:getExtThermostatData', now, ecobee.lastExtThermostats, elapsed, frequency)
+        if elapsed > frequency:
+            ecobee.getExtThermostatData = now
+            print('ecobee:getExtThermostatData - collect')
+        else:
+            print('ecobee:getExtThermostatData - skipping')
+            return
+        self.getExtThermostats()
         
     def getWeather(self):
         # rely on the data returned by getThermostatData()
@@ -671,7 +697,7 @@ class collectThermostatData:
         if self.backupMode.active():
             print('backupMode.active: skipping Collector')
             return
-        self.Getter()
+        self.Getter(self.frequency)
         self.Saver(self.API)
 
 class deHumidify:
@@ -929,7 +955,7 @@ def main():
     NCthermostats = ['Loft', 'LivingRoom']
     SCthermostats = ['Upstairs', 'Downstairs']
     # intialize API.thermostats
-    API.getThermostatData()
+    API.getThermostatData(dt.timedelta(minutes = 11))
     HVAComde = normalTermostatModes()
     NCsave = saveEcobeeData(HVAComde, thermostats = NCthermostats, where = 'NC')
     SCsave = saveEcobeeData(HVAComde, thermostats = SCthermostats, where = 'SC')
@@ -940,13 +966,13 @@ def main():
 
     NCruntime = collectThermostatData(scheduler)
     SCruntime = collectThermostatData(scheduler)
-    NCruntime.Schedule(API.getThermostatData, NCsave.ThermostatData, API, minutes = 12, seconds = 45)
+    NCruntime.Schedule(API.getThermostatData, NCsave.ThermostatData, API, minutes = 7, seconds = 45)
     SCruntime.Schedule(API.getThermostatData, SCsave.ThermostatData, API, minutes = 7, seconds = 45)
     
     NCextRuntime = collectThermostatData(scheduler)
     SCextRuntime = collectThermostatData(scheduler)
-    NCextRuntime.Schedule(API.getExtThermostats, NCsave.ExtRuntimeData, API, minutes = 12)
-    SCextRuntime.Schedule(API.getExtThermostats, SCsave.ExtRuntimeData, API, minutes = 12)
+    NCextRuntime.Schedule(API.getExtThermostatData, NCsave.ExtRuntimeData, API, minutes = 12)
+    SCextRuntime.Schedule(API.getExtThermostatData, SCsave.ExtRuntimeData, API, minutes = 12)
     
     NCweather = collectThermostatData(scheduler)
     SCweather = collectThermostatData(scheduler)
