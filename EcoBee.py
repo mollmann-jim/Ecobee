@@ -16,6 +16,7 @@ import sys
 import sched
 import subprocess
 from traceback import print_exc, print_stack
+from dateutil.relativedelta import relativedelta
 
 def setLogging(logger):
     global LOGFILE
@@ -879,7 +880,7 @@ class TimeOfUse:
             dt.timedelta(minutes = 2)
         print('checkActiveSeason', startTime, endTime, now)
         if endTime < startTime:
-            endTime += dt.timedelta(years = 1)
+            endTime += relativedelta(years = 1)
             print('checkActiveSeason', startTime, endTime, now)
         if startTime <= now <= endTime:
             print('Active')
@@ -1007,7 +1008,7 @@ def main():
         SCdehumidify.Schedule(API, SCstatus.addLine, startHour = 4, startMinute = 50, duration = 60)
     
     SCTimeOfUseSummer = TimeOfUse(scheduler, HVAComde, thermostats = SCthermostats, printer = SCprint)
-    SCTimeOfUseSummer.setDates(startMonth = 6, startDay = 1, endMonth = 9, endDay = 30)
+    SCTimeOfUseSummer.setDates(startMonth = 4, startDay = 1, endMonth = 10, endDay = 31)
     if True:
         SCTimeOfUseSummer.Schedule(API, offHour = 15, offMinute = 0, normalHour = 18, normalMinute = 0)
     else:
@@ -1015,6 +1016,10 @@ def main():
         S = S + dt.timedelta(minutes = 5)
         E = E + dt.timedelta(minutes = 20)
         SCTimeOfUseSummer.Schedule(API, offHour = S.hour , offMinute = S.minute , normalHour = E.hour , normalMinute = E.minute)
+
+    SCTimeOfUseWinter = TimeOfUse(scheduler, HVAComde, thermostats = SCthermostats, printer = SCprint)
+    SCTimeOfUseWinter.setDates(startMonth = 11, startDay = 1, endMonth = 3, endDay = 31)
+    SCTimeOfUseWinter.Schedule(API, offHour = 6, offMinute = 0, normalHour = 9, normalMinute = 0)
 
     ###############3 debug
     '''
