@@ -505,14 +505,14 @@ class ecobee(pyecobee.Ecobee):
         elapsed = now - ecobee.lastExtThermostats
         print('ecobee:getExtThermostatData', now, ecobee.lastExtThermostats, elapsed, frequency)
         if elapsed > frequency:
-            ecobee.getExtThermostatData = now
+            ecobee.lastExtThermostats = now
             print('ecobee:getExtThermostatData - collect')
         else:
             print('ecobee:getExtThermostatData - skipping')
             return
         self.getExtThermostats()
         
-    def getWeather(self):
+    def getWeather(self, frequency):
         # rely on the data returned by getThermostatData()
         #print(dt.datetime.now(), 'getWeather')
         pass
