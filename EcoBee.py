@@ -464,7 +464,7 @@ class ecobee(pyecobee.Ecobee):
                 time.sleep(delay)
         return False
 
-    def getThermostatData(self, frequency = dt.datetime(seconds = 1)):
+    def getThermostatData(self, frequency = dt.timedelta(seconds = 1)):
         #print(dt.datetime.now(), 'getThermostatData')
 
         now = dt.datetime.now()
@@ -501,7 +501,7 @@ class ecobee(pyecobee.Ecobee):
         #print('thermostats:')
         #self.pp.pprint(self.thermostats)
 
-    def getExtThermostatData(self, frequency = dt.datetime(seconds = 1)):
+    def getExtThermostatData(self, frequency = dt.timedelta(seconds = 1)):
         now = dt.datetime.now()
         elapsed = now - ecobee.lastExtThermostats
         print('ecobee:getExtThermostatData', now, ecobee.lastExtThermostats, elapsed, frequency)
@@ -777,49 +777,7 @@ class deHumidify:
                                                                        outdoorHigh,
                                                                        climate)
         self.Status(note)
-
-        '''
-        cool_temp = [82] * len(self.API.thermostats)
-        heat_temp = [50] * len(self.API.thermostats)
-        end_date  = [None] * len(self.API.thermostats)
-        end_time  = [None] * len(self.API.thermostats)
-        self.debugVacation(myThermos, hdr = 'before delete')
-        for i in myThermos:
-            vacName      = self.API.thermostats[i]['events'][0]['name']
-            cool_temp[i] = self.API.thermostats[i]['events'][0]['coolHoldTemp']
-            heat_temp[i] = self.API.thermostats[i]['events'][0]['heatHoldTemp']
-            end_date[i]  = self.API.thermostats[i]['events'][0]['endDate']
-            end_time[i]  = self.API.thermostats[i]['events'][0]['endTime']
-            self.API.delete_vacation(index = i, vacation = vacName)
-        time.sleep(10)
-        self.API.getThermostatData()
-        self.Status('deHumidify: vacation deleted: ' + vacName)
-        self.debugVacation(myThermos, hdr = 'after delete')
-        '''
         finish = dt.datetime.now() + dt.timedelta(minutes = self.duration)
-        '''
-        # add new vacation to start after hold
-        print('hhh: create vacation', myThermos, self.where, cool_temp, heat_temp, end_date, end_time)
-        for i in myThermos:
-            self.API.create_vacation(index = i,
-                                     vacation_name = ('notThere' + self.where), 
-                                     cool_temp     = int(cool_temp[i]) / 10,
-                                     heat_temp     = int(heat_temp[i]) / 10,
-                                     start_date    = str(finish.date()),
-                                     start_time    = str(finish.time())[0:8],
-                                     end_date      = end_date[i],
-                                     end_time      = end_time[i]
-                                     )
-        time.sleep(10)
-        self.API.getThermostatData()
-        self.debugVacation(myThermos, hdr = 'after adding back')
-        for i in myThermos:
-            self.Status('deHumidify: vacation created ' +
-                        str(int(cool_temp[i]) / 10) + ' / ' +
-                        str(int(heat_temp[i]) / 10))
-            time.sleep(2)
-        #self.pp.pprint(self.API.thermostats)
-        '''
 
         for i in myThermos:
             self.API.Set_Climate_hold(index = i,
