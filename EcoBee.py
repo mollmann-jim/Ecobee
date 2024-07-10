@@ -464,7 +464,7 @@ class ecobee(pyecobee.Ecobee):
                 time.sleep(delay)
         return False
 
-    def getThermostatData(self, frequency):
+    def getThermostatData(self, frequency = dt.datetime(seconds = 1)):
         #print(dt.datetime.now(), 'getThermostatData')
 
         now = dt.datetime.now()
@@ -501,7 +501,7 @@ class ecobee(pyecobee.Ecobee):
         #print('thermostats:')
         #self.pp.pprint(self.thermostats)
 
-    def getExtThermostatData(self, frequency):
+    def getExtThermostatData(self, frequency = dt.datetime(seconds = 1)):
         now = dt.datetime.now()
         elapsed = now - ecobee.lastExtThermostats
         print('ecobee:getExtThermostatData', now, ecobee.lastExtThermostats, elapsed, frequency)
@@ -698,7 +698,7 @@ class collectThermostatData:
         if self.backupMode.active():
             print('backupMode.active: skipping Collector')
             return
-        self.Getter(self.frequency)
+        self.Getter(frequency = self.frequency)
         self.Saver(self.API)
 
 class deHumidify:
@@ -956,7 +956,7 @@ def main():
     NCthermostats = ['Loft', 'LivingRoom']
     SCthermostats = ['Upstairs', 'Downstairs']
     # intialize API.thermostats
-    API.getThermostatData(dt.timedelta(minutes = 11))
+    API.getThermostatData()
     HVAComde = normalTermostatModes()
     NCsave = saveEcobeeData(HVAComde, thermostats = NCthermostats, where = 'NC')
     SCsave = saveEcobeeData(HVAComde, thermostats = SCthermostats, where = 'SC')
