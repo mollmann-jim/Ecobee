@@ -316,7 +316,8 @@ class saveEcobeeData():
                   API.thermostats[i]['name'])
             '''
             #print('ZZZ name:',  API.thermostats[i]['name'], i)
-            self.normalModes.current(API.thermostats[i]['name'], API.thermostats[i]['settings']['hvacMode'])
+            self.normalModes.current(API.thermostats[i]['name'],
+                                     API.thermostats[i]['settings']['hvacMode'])
             if API.thermostats[i]['name'] not in self.thermostats:
                 #print('ZZZ skipping')
                 continue
@@ -869,7 +870,8 @@ class TimeOfUse:
         if not self.checkActiveOffTime():
             return
         self.offTime += dt.timedelta(days = 1)
-        self.scheduler.enterabs(time.mktime(self.offTime.timetuple()), 1, self.setModeOff, ())
+        self.scheduler.enterabs(time.mktime(self.offTime.timetuple()), 1,
+                                self.setModeOff, ())
         for i in range(len(self.API.thermostats)):
             if self.API.thermostats[i]['name'] in self.thermostats:
                 self.setMode(self.modeOff, i)
@@ -879,7 +881,8 @@ class TimeOfUse:
         if not self.checkActiveSeason():
             return
         self.normalTime += dt.timedelta(days = 1)
-        self.scheduler.enterabs(time.mktime(self.offTime.timetuple()), 1, self.setModeNormal, ())
+        self.scheduler.enterabs(time.mktime(self.offTime.timetuple()), 1,
+                                self.setModeNormal, ())
         modes = self.normalModes.get()
         for i in range(len(self.API.thermostats)):
             if self.API.thermostats[i]['name'] in self.thermostats:
@@ -887,7 +890,8 @@ class TimeOfUse:
                 if mode is not None:
                     self.setMode(mode, i)
                 else:
-                    print('setModeNormal', self.API.thermostats[i]['name'], 'not found', modes)
+                    print('setModeNormal', self.API.thermostats[i]['name'],
+                          'not found', modes)
 
     def Schedule(self, API, offHour = 15, offMinute = 0, normalHour = 18, normalMinute = 0):
         self.offHour      = offHour
