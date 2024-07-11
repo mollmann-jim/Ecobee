@@ -929,8 +929,8 @@ def main():
 
     NCruntime = collectThermostatData(scheduler)
     SCruntime = collectThermostatData(scheduler)
-    NCruntime.Schedule(API.getThermostatData, NCsave.ThermostatData, API, minutes = 7, seconds = 45)
-    SCruntime.Schedule(API.getThermostatData, SCsave.ThermostatData, API, minutes = 7, seconds = 45)
+    NCruntime.Schedule(API.getThermostatData, NCsave.ThermostatData, API, minutes = 2, seconds = 45)
+    SCruntime.Schedule(API.getThermostatData, SCsave.ThermostatData, API, minutes = 2, seconds = 45)
     
     NCextRuntime = collectThermostatData(scheduler)
     SCextRuntime = collectThermostatData(scheduler)
@@ -953,35 +953,45 @@ def main():
 
     NCstatus = Status(scheduler, thermostats = NCthermostats, printer = NCprint)
     SCstatus = Status(scheduler, thermostats = SCthermostats, printer = SCprint)
-    NCstatus.Schedule(API, NCstatus.printStatusLine, minutes = 33)
-    SCstatus.Schedule(API, SCstatus.printStatusLine, minutes = 30)
+    NCstatus.Schedule(API, NCstatus.printStatusLine, minutes = 3)
+    SCstatus.Schedule(API, SCstatus.printStatusLine, minutes = 3)
 
     NCdehumidify = deHumidify(scheduler, thermostats = NCthermostats, where = 'NC')
     SCdehumidify = deHumidify(scheduler, thermostats = SCthermostats, where = 'SC')
 
     host = os.getenv('HOSTNAME')
     if host == 'jim4':
-        NCdehumidify.Schedule(API, NCstatus.addLine, startHour = 6, startMinute = 30, duration = 60)
-        SCdehumidify.Schedule(API, SCstatus.addLine, startHour = 4, startMinute = 45, duration = 60)
+        NCdehumidify.Schedule(API, NCstatus.addLine, startHour = 6,
+                              startMinute = 30, duration = 60)
+        SCdehumidify.Schedule(API, SCstatus.addLine, startHour = 4,
+                              startMinute = 45, duration = 60)
     else:
         # if not tunning at "home", set start 5 minutes later
         # should allow home to disable vacation mode, if it is running
-        NCdehumidify.Schedule(API, NCstatus.addLine, startHour = 6, startMinute = 35, duration = 60)
-        SCdehumidify.Schedule(API, SCstatus.addLine, startHour = 4, startMinute = 50, duration = 60)
+        NCdehumidify.Schedule(API, NCstatus.addLine, startHour = 6,
+                              startMinute = 35, duration = 60)
+        SCdehumidify.Schedule(API, SCstatus.addLine, startHour = 4,
+                              startMinute = 50, duration = 60)
     
-    SCTimeOfUseSummer = TimeOfUse(scheduler, HVAComde, thermostats = SCthermostats, printer = SCprint)
-    SCTimeOfUseSummer.setDates(startMonth = 4, startDay = 1, endMonth = 10, endDay = 31)
+    SCTimeOfUseSummer = TimeOfUse(scheduler, HVAComde, thermostats = SCthermostats,
+                                  printer = SCprint)
+    SCTimeOfUseSummer.setDates(startMonth = 4, startDay = 1, endMonth = 10,
+                               endDay = 31)
     if True:
-        SCTimeOfUseSummer.Schedule(API, offHour = 15, offMinute = 0, normalHour = 18, normalMinute = 0)
+        SCTimeOfUseSummer.Schedule(API, offHour = 15, offMinute = 0,
+                                   normalHour = 18, normalMinute = 0)
     else:
         S = E = dt.datetime.now()
         S = S + dt.timedelta(minutes = 5)
         E = E + dt.timedelta(minutes = 20)
-        SCTimeOfUseSummer.Schedule(API, offHour = S.hour , offMinute = S.minute , normalHour = E.hour , normalMinute = E.minute)
+        SCTimeOfUseSummer.Schedule(API, offHour = S.hour , offMinute = S.minute ,
+                                   normalHour = E.hour , normalMinute = E.minute)
 
-    SCTimeOfUseWinter = TimeOfUse(scheduler, HVAComde, thermostats = SCthermostats, printer = SCprint)
+    SCTimeOfUseWinter = TimeOfUse(scheduler, HVAComde, thermostats = SCthermostats,
+                                  printer = SCprint)
     SCTimeOfUseWinter.setDates(startMonth = 11, startDay = 1, endMonth = 3, endDay = 31)
-    SCTimeOfUseWinter.Schedule(API, offHour = 6, offMinute = 0, normalHour = 9, normalMinute = 0)
+    SCTimeOfUseWinter.Schedule(API, offHour = 6, offMinute = 0, normalHour = 9,
+                               normalMinute = 0)
 
     ###############3 debug
     '''
@@ -1005,11 +1015,11 @@ def main():
     scheduler.run()
 
 if 'New' in sys.argv[0]:
-    DBname  = '/home/jim/tools/Ecobee.Time.of.Use/Thermostats.New.sql'
-    LOGFILE = '/home/jim/tools/Ecobee.Time.of.Use/ecobee.New.log'
+    DBname  = '/home/jim/tools/Ecobee/Thermostats.New.sql'
+    LOGFILE = '/home/jim/tools/Ecobee/ecobee.New.log'
 else:
-    DBname  = '/home/jim/tools/Ecobee.Time.of.Use/Thermostats.sql'
-    LOGFILE = '/home/jim/tools/Ecobee.Time.of.Use/ecobee.log'
+    DBname  = '/home/jim/tools/Ecobee/Thermostats.sql'
+    LOGFILE = '/home/jim/tools/Ecobee/ecobee.log'
 
 if __name__ == '__main__':
     # want unbuffered stdout for use with "tee"
