@@ -16,6 +16,7 @@ import sys
 import sched
 import subprocess
 from traceback import print_exc, print_stack
+from dateutil.relativedelta import relativedelta
 
 def setLogging(logger):
     global LOGFILE
@@ -91,11 +92,40 @@ class fdPrint:
     def Print(self, line):
         myLine = str.encode(line)
         os.write(self.fd, myLine)
-        os.fsync(self.fd)
+        if os.isatty(self.fd):
+            pass
+        else:
+            os.fsync(self.fd)
+
+class normalTermostatModes:
+    def  __init__(self):
+        self.savedHVACmodes = {}
+        self.currentHVACmodes = {}
         
+    def current(self, thermostat, mode):
+        #print('normalTermostatModes:current', thermostat, mode)
+        self.currentHVACmodes[thermostat] = mode
+
+    def update(self, Saver):
+        for thermostat in self.currentHVACmodes:
+            curMode = self.currentHVACmodes[thermostat]
+            savMode = self.savedHVACmodes.get(thermostat, None)
+            if curMode == 'off' or curMode == None or curMode == savMode:
+                pass
+            else:
+                Saver(thermostat, curMode)
+                print('normalTermostatModes:update', thermostat, savMode, '->', curMode)
+                self.savedHVACmodes[thermostat] = curMode
+
+    def get(self):
+        return self.savedHVACmodes
+
+    def getSaved(self, DBgetSaved):
+        self.savedHVACmodes = DBgetSaved()
+        print('normalTermostatModes:getSaved', self.savedHVACmodes)
         
 class saveEcobeeData():
-    def __init__(self, thermostats = [], where = 'noWhere'):
+    def __init__(self, HVACmode, thermostats = [], where = 'noWhere'):
         global DBname
         self.prevStatusTime = [0, 0, 0, 0]
         #DBname = '/home/jim/tools/Ecobee/MBthermostat.sched.sql'
@@ -106,6 +136,7 @@ class saveEcobeeData():
         self.c = {}
         self.initDB()
         self.prevWeather = 0
+        self.normalModes = HVACmode
         self.pp = pprint.PrettyPrinter(indent=4, sort_dicts=False)
         
     def initDB(self):
@@ -217,6 +248,16 @@ class saveEcobeeData():
                     'CLEARING SKIES', 'BREAKS OF SUN LATE',
                     'EARLY FOG FOLLOWED BY SUNNY SKIES', 'AFTERNOON CLOUDS',
                     'MORNING CLOUDS', 'SMOKE', 'LOW LEVEL HAZE']
+
+        self.c['HVACmode'] = self.DB.cursor()
+        #drop = 'DROP TABLE IF EXISTS HVACmode;'
+        #self.c['HVACmode'].execute(drop)
+        create = 'CREATE TABLE IF NOT EXISTS HVACmode ( \n' +\
+            ' thermostat TEXT PRIMARY KEY, \n' +\
+            ' HVACmode   TEXT,    \n' +\
+            ' timestamp  INTEGER \n' +\
+            ' );'
+        self.c['HVACmode'].execute(create)
         
     def ExtRuntimeData(self, API):
         #print(dt.datetime.now(), 'save.ExtRuntimeData')
@@ -275,6 +316,8 @@ class saveEcobeeData():
                   API.thermostats[i]['name'])
             '''
             #print('ZZZ name:',  API.thermostats[i]['name'], i)
+            self.normalModes.current(API.thermostats[i]['name'],
+                                     API.thermostats[i]['settings']['hvacMode'])
             if API.thermostats[i]['name'] not in self.thermostats:
                 #print('ZZZ skipping')
                 continue
@@ -321,6 +364,28 @@ class saveEcobeeData():
                       holdUntil]
             self.c[table].execute(insert, values)
             self.DB.commit()
+        self.normalModes.update(self.saveHVACmode)
+
+    def saveHVACmode(self, thermostat, mode):
+        now = dt.datetime.now()
+        insert = 'INSERT OR REPLACE INTO HVACmode' +\
+            ' (thermostat, HVACmode, timestamp)' +\
+            ' VALUES( ?, ?, ? );'
+        values = (thermostat, mode, now)
+        self.c['HVACmode'].execute(insert, values)
+        print('saveHVACmode update:', thermostat, mode, now)
+        self.DB.commit()
+
+    def getSavedHVACmodes(self):
+        modes = {}
+        select = 'SELECT thermostat, HVACmode, timestamp FROM HVACmode;'
+        self.c['HVACmode'].execute(select)
+        result = self.c['HVACmode'].fetchall()
+        for rec in result:
+            print(rec['thermostat'], rec['HVACmode'], rec['timestamp'])
+            modes[rec['thermostat']] = rec['HVACmode']
+        print('getSavedHVACmodes', modes)
+        return modes
 
     def WeatherData(self, API):
         #print(dt.datetime.now(), 'save.WeatherData')
@@ -380,6 +445,9 @@ class saveEcobeeData():
     
             
 class ecobee(pyecobee.Ecobee):
+    lastThermostats    = dt.datetime(2000, 1, 1)
+    lastExtThermostats = dt.datetime(2000, 1, 1)
+
     def __init__(self,  config_filename: str = None, config: dict = None):
         pyecobee.Ecobee.__init__(self, config_filename = config_filename, config = config)
         self.pp = pprint.PrettyPrinter(indent=4, sort_dicts=False)
@@ -397,8 +465,19 @@ class ecobee(pyecobee.Ecobee):
                 time.sleep(delay)
         return False
 
-    def getThermostatData(self):
+    def getThermostatData(self, frequency = dt.timedelta(seconds = 1)):
         #print(dt.datetime.now(), 'getThermostatData')
+
+        now = dt.datetime.now()
+        elapsed = now - ecobee.lastThermostats
+        print('ecobee:getThermostatData', now, ecobee.lastThermostats, elapsed, frequency)
+        if elapsed > frequency:
+            ecobee.lastThermostats = now
+            print('ecobee:getThermostatData - collect')
+        else:
+            print('ecobee:getThermostatData - skipping')
+            return
+
         if self.access_token is None:
             rc = self.request_pin()
             print('request pin:', rc, ' PIN:', self.pin)
@@ -422,8 +501,20 @@ class ecobee(pyecobee.Ecobee):
                     print('get_thermostats() failed again')
         #print('thermostats:')
         #self.pp.pprint(self.thermostats)
+
+    def getExtThermostatData(self, frequency = dt.timedelta(seconds = 1)):
+        now = dt.datetime.now()
+        elapsed = now - ecobee.lastExtThermostats
+        print('ecobee:getExtThermostatData', now, ecobee.lastExtThermostats, elapsed, frequency)
+        if elapsed > frequency:
+            ecobee.lastExtThermostats = now
+            print('ecobee:getExtThermostatData - collect')
+        else:
+            print('ecobee:getExtThermostatData - skipping')
+            return
+        self.getExtThermostats()
         
-    def getWeather(self):
+    def getWeather(self, frequency):
         # rely on the data returned by getThermostatData()
         #print(dt.datetime.now(), 'getWeather')
         pass
@@ -608,7 +699,7 @@ class collectThermostatData:
         if self.backupMode.active():
             print('backupMode.active: skipping Collector')
             return
-        self.Getter()
+        self.Getter(frequency = self.frequency)
         self.Saver(self.API)
 
 class deHumidify:
@@ -687,49 +778,7 @@ class deHumidify:
                                                                        outdoorHigh,
                                                                        climate)
         self.Status(note)
-
-        '''
-        cool_temp = [82] * len(self.API.thermostats)
-        heat_temp = [50] * len(self.API.thermostats)
-        end_date  = [None] * len(self.API.thermostats)
-        end_time  = [None] * len(self.API.thermostats)
-        self.debugVacation(myThermos, hdr = 'before delete')
-        for i in myThermos:
-            vacName      = self.API.thermostats[i]['events'][0]['name']
-            cool_temp[i] = self.API.thermostats[i]['events'][0]['coolHoldTemp']
-            heat_temp[i] = self.API.thermostats[i]['events'][0]['heatHoldTemp']
-            end_date[i]  = self.API.thermostats[i]['events'][0]['endDate']
-            end_time[i]  = self.API.thermostats[i]['events'][0]['endTime']
-            self.API.delete_vacation(index = i, vacation = vacName)
-        time.sleep(10)
-        self.API.getThermostatData()
-        self.Status('deHumidify: vacation deleted: ' + vacName)
-        self.debugVacation(myThermos, hdr = 'after delete')
-        '''
         finish = dt.datetime.now() + dt.timedelta(minutes = self.duration)
-        '''
-        # add new vacation to start after hold
-        print('hhh: create vacation', myThermos, self.where, cool_temp, heat_temp, end_date, end_time)
-        for i in myThermos:
-            self.API.create_vacation(index = i,
-                                     vacation_name = ('notThere' + self.where), 
-                                     cool_temp     = int(cool_temp[i]) / 10,
-                                     heat_temp     = int(heat_temp[i]) / 10,
-                                     start_date    = str(finish.date()),
-                                     start_time    = str(finish.time())[0:8],
-                                     end_date      = end_date[i],
-                                     end_time      = end_time[i]
-                                     )
-        time.sleep(10)
-        self.API.getThermostatData()
-        self.debugVacation(myThermos, hdr = 'after adding back')
-        for i in myThermos:
-            self.Status('deHumidify: vacation created ' +
-                        str(int(cool_temp[i]) / 10) + ' / ' +
-                        str(int(heat_temp[i]) / 10))
-            time.sleep(2)
-        #self.pp.pprint(self.API.thermostats)
-        '''
 
         for i in myThermos:
             self.API.Set_Climate_hold(index = i,
@@ -750,7 +799,114 @@ class deHumidify:
         for i in Thermos:
             self.pp.pprint(self.API.thermostats[i]['name'])
             self.pp.pprint(self.API.thermostats[i]['events'])
+
+class TimeOfUse:
+    def __init__(self, scheduler, HVACnode, thermostats = [], printer = None):
+        self.scheduler   = scheduler
+        self.thermostats = thermostats
+        self.myPrint     = printer
+        self.normalModes = HVACnode
+        self.modeOff     = 'off'
+        self.modeNormal  = []
+
+    def setDates(self, startMonth = 1, startDay = 2, endMonth = 3, endDay = 4):
+        self.startMonth = startMonth
+        self.startDay   = startDay
+        self.endMonth   = endMonth
+        self.endDay     = endDay
+        print('TimeOfUse.setDates', startMonth, startDay, endMonth, endDay)
         
+    def setFirst(self, startHour, startMinute, modeSet, mode = None):
+        now = dt.datetime.now()
+        firstTime = now.replace(hour = startHour, minute = startMinute,
+                                second = 0, microsecond = 0) - dt.timedelta(days = 1)
+        while firstTime < now:
+            firstTime += dt.timedelta(days = 1)
+        self.scheduler.enterabs(time.mktime(firstTime.timetuple()), 1, modeSet, ())
+        if mode == 'normal':
+            print('setFirst:Normal', self.modeNormal, firstTime)
+            self.normalTime = firstTime
+        elif mode == 'off':
+            print('setFirst:off:', self.modeOff, firstTime)
+            self.offTime = firstTime
+        else:
+            print('TimeOfUse.setFirst unknow mode', mode)
+
+    def checkActiveSeason(self):
+        now = dt.datetime.now()
+        startTime = dt.datetime(now.year, self.startMonth, self.startDay)
+        endTime   = dt.datetime(now.year, self.endMonth,   self.endDay) - \
+            dt.timedelta(minutes = 2)
+        print('checkActiveSeason', startTime, endTime, now)
+        if endTime < startTime:
+            endTime += relativedelta(years = 1)
+            print('checkActiveSeason', startTime, endTime, now)
+        if startTime <= now <= endTime:
+            print('Active')
+            return True
+        else:
+            print('InActive')
+            return False
+
+    def checkActiveOffTime(self):
+        now = dt.datetime.now()
+        startTime = dt.datetime(now.year, now.month, now.day, \
+                                hour = self.offHour,    minute = self.offMinute)
+        endTime   = dt.datetime(now.year, now.month, now.day, \
+                                hour = self.normalHour, minute = self.normalMinute) - \
+                                dt.timedelta(minutes = 2)
+        print('checkActiveOffTime', startTime, endTime, now, now > startTime, now < endTime)
+        if startTime <= now <= endTime:
+            print('checkActiveOffTime: True')
+            return True
+        else:
+            print('checkActiveOffTime: False')
+            return False
+
+    def setModeOff(self):
+        print('setModeOff')
+        if not self.checkActiveSeason():
+            return
+        if not self.checkActiveOffTime():
+            return
+        self.offTime += dt.timedelta(days = 1)
+        self.scheduler.enterabs(time.mktime(self.offTime.timetuple()), 1,
+                                self.setModeOff, ())
+        for i in range(len(self.API.thermostats)):
+            if self.API.thermostats[i]['name'] in self.thermostats:
+                self.setMode(self.modeOff, i)
+
+    def setModeNormal(self):
+        print('setModeNormal')
+        if not self.checkActiveSeason():
+            return
+        self.normalTime += dt.timedelta(days = 1)
+        self.scheduler.enterabs(time.mktime(self.offTime.timetuple()), 1,
+                                self.setModeNormal, ())
+        modes = self.normalModes.get()
+        for i in range(len(self.API.thermostats)):
+            if self.API.thermostats[i]['name'] in self.thermostats:
+                mode = modes.get(self.API.thermostats[i]['name'], None)
+                if mode is not None:
+                    self.setMode(mode, i)
+                else:
+                    print('setModeNormal', self.API.thermostats[i]['name'],
+                          'not found', modes)
+
+    def Schedule(self, API, offHour = 15, offMinute = 0, normalHour = 18, normalMinute = 0):
+        self.offHour      = offHour
+        self.offMinute    = offMinute
+        self.normalHour   = normalHour
+        self.normalMinute = normalMinute
+        self.API = API
+        self.setFirst(offHour,    offMinute,    self.setModeOff,    mode = 'off')
+        self.setFirst(normalHour, normalMinute, self.setModeNormal, mode = 'normal')
+        #self.getNormalMode()
+        self.setModeOff()     # set "off" - check first
+
+    def setMode(self, mode, i):
+        print('setMode', mode, i, self.API.thermostats[i]['name'], dt.datetime.now())
+        self.API.set_hvac_mode(i, mode)
         
 def main():
     pp = pprint.PrettyPrinter(indent=4, sort_dicts=False)
@@ -763,8 +919,10 @@ def main():
     SCthermostats = ['Upstairs', 'Downstairs']
     # intialize API.thermostats
     API.getThermostatData()
-    NCsave = saveEcobeeData(thermostats = NCthermostats, where = 'NC')
-    SCsave = saveEcobeeData(thermostats = SCthermostats, where = 'SC')
+    HVAComde = normalTermostatModes()
+    NCsave = saveEcobeeData(HVAComde, thermostats = NCthermostats, where = 'NC')
+    SCsave = saveEcobeeData(HVAComde, thermostats = SCthermostats, where = 'SC')
+    HVAComde.getSaved(SCsave.getSavedHVACmodes)
 
     # Build a scheduler object that will look at absolute times
     scheduler = sched.scheduler(time.time, time.sleep)
@@ -776,8 +934,8 @@ def main():
     
     NCextRuntime = collectThermostatData(scheduler)
     SCextRuntime = collectThermostatData(scheduler)
-    NCextRuntime.Schedule(API.getExtThermostats, NCsave.ExtRuntimeData, API, minutes = 12)
-    SCextRuntime.Schedule(API.getExtThermostats, SCsave.ExtRuntimeData, API, minutes = 12)
+    NCextRuntime.Schedule(API.getExtThermostatData, NCsave.ExtRuntimeData, API, minutes = 12)
+    SCextRuntime.Schedule(API.getExtThermostatData, SCsave.ExtRuntimeData, API, minutes = 12)
     
     NCweather = collectThermostatData(scheduler)
     SCweather = collectThermostatData(scheduler)
@@ -800,15 +958,41 @@ def main():
 
     NCdehumidify = deHumidify(scheduler, thermostats = NCthermostats, where = 'NC')
     SCdehumidify = deHumidify(scheduler, thermostats = SCthermostats, where = 'SC')
+
     host = os.getenv('HOSTNAME')
     if host == 'jim4':
-        NCdehumidify.Schedule(API, NCstatus.addLine, startHour = 6, startMinute = 30, duration = 60)
-        SCdehumidify.Schedule(API, SCstatus.addLine, startHour = 4, startMinute = 45, duration = 60)
+        NCdehumidify.Schedule(API, NCstatus.addLine, startHour = 6,
+                              startMinute = 30, duration = 60)
+        SCdehumidify.Schedule(API, SCstatus.addLine, startHour = 4,
+                              startMinute = 45, duration = 60)
     else:
         # if not tunning at "home", set start 5 minutes later
         # should allow home to disable vacation mode, if it is running
-        NCdehumidify.Schedule(API, NCstatus.addLine, startHour = 6, startMinute = 35, duration = 60)
-        SCdehumidify.Schedule(API, SCstatus.addLine, startHour = 4, startMinute = 50, duration = 60)
+        NCdehumidify.Schedule(API, NCstatus.addLine, startHour = 6,
+                              startMinute = 35, duration = 60)
+        SCdehumidify.Schedule(API, SCstatus.addLine, startHour = 4,
+                              startMinute = 50, duration = 60)
+    
+    SCTimeOfUseSummer = TimeOfUse(scheduler, HVAComde, thermostats = SCthermostats,
+                                  printer = SCprint)
+    SCTimeOfUseSummer.setDates(startMonth = 4, startDay = 1, endMonth = 10,
+                               endDay = 31)
+    if True:
+        SCTimeOfUseSummer.Schedule(API, offHour = 15, offMinute = 0,
+                                   normalHour = 18, normalMinute = 0)
+    else:
+        S = E = dt.datetime.now()
+        S = S + dt.timedelta(minutes = 5)
+        E = E + dt.timedelta(minutes = 20)
+        SCTimeOfUseSummer.Schedule(API, offHour = S.hour , offMinute = S.minute ,
+                                   normalHour = E.hour , normalMinute = E.minute)
+
+    SCTimeOfUseWinter = TimeOfUse(scheduler, HVAComde, thermostats = SCthermostats,
+                                  printer = SCprint)
+    SCTimeOfUseWinter.setDates(startMonth = 11, startDay = 1, endMonth = 3, endDay = 31)
+    SCTimeOfUseWinter.Schedule(API, offHour = 6, offMinute = 0, normalHour = 9,
+                               normalMinute = 0)
+
     ###############3 debug
     '''
     DH = dt.datetime.now().replace(microsecond = 0) + dt.timedelta(minutes = 10)
