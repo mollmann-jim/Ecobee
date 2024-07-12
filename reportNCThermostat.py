@@ -55,6 +55,11 @@ def printHeader():
 
 def checkSanity(runStats, date, where):
     global insaneUsage
+    # do not flag old usage
+    now = dt.datetime.now()
+    date = dt.datetime.strptime(date, '%Y-%m-%d')
+    if (now - date) > dt.timedelta(days = 31):
+        return False
     for which in ['heat', 'cool', 'fanOn']:
         if runStats[which] is not None:
             runPct = 100.0 * runStats[which] / runStats['elapsed']
