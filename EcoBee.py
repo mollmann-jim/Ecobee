@@ -92,9 +92,7 @@ class fdPrint:
     def Print(self, line):
         myLine = str.encode(line)
         os.write(self.fd, myLine)
-        if os.isatty(self.fd):
-            pass
-        else:
+        if not os.isatty(self.fd):
             os.fsync(self.fd)
 
 class normalTermostatModes:
@@ -465,17 +463,25 @@ class ecobee(pyecobee.Ecobee):
                 time.sleep(delay)
         return False
 
+    def debugThermostatSkip(self, where, now, elapsed, frequency, action):
+        elapsed =  elapsed - dt.timedelta(microseconds = elapsed.microseconds)
+        print('ecobee:get' + where + 'ThermostatData',
+              now,
+              ecobee.lastThermostats.replace(microsecond = 0),
+              elapsed,
+              frequency,
+              action)
+
     def getThermostatData(self, frequency = dt.timedelta(seconds = 1)):
         #print(dt.datetime.now(), 'getThermostatData')
 
-        now = dt.datetime.now()
+        now = dt.datetime.now().replace(microsecond = 0)
         elapsed = now - ecobee.lastThermostats
-        print('ecobee:getThermostatData', now, ecobee.lastThermostats, elapsed, frequency)
         if elapsed > frequency:
             ecobee.lastThermostats = now
-            print('ecobee:getThermostatData - collect')
+            self.debugThermostatSkip('', now, elapsed, frequency, 'collect')
         else:
-            print('ecobee:getThermostatData - skipping')
+            self.debugThermostatSkip('', now, elapsed, frequency, 'skipping')
             return
 
         if self.access_token is None:
@@ -503,14 +509,13 @@ class ecobee(pyecobee.Ecobee):
         #self.pp.pprint(self.thermostats)
 
     def getExtThermostatData(self, frequency = dt.timedelta(seconds = 1)):
-        now = dt.datetime.now()
+        now = dt.datetime.now().replace(microsecond = 0)
         elapsed = now - ecobee.lastExtThermostats
-        print('ecobee:getExtThermostatData', now, ecobee.lastExtThermostats, elapsed, frequency)
         if elapsed > frequency:
             ecobee.lastExtThermostats = now
-            print('ecobee:getExtThermostatData - collect')
+            self.debugThermostatSkip('Ext', now, elapsed, frequency, 'collect')
         else:
-            print('ecobee:getExtThermostatData - skipping')
+            self.debugThermostatSkip('Ext', now, elapsed, frequency, 'skipping')
             return
         self.getExtThermostats()
         
@@ -864,7 +869,6 @@ class TimeOfUse:
             return False
 
     def setModeOff(self):
-        print('setModeOff')
         if not self.checkActiveSeason():
             return
         if not self.checkActiveOffTime():
@@ -875,6 +879,7 @@ class TimeOfUse:
         for i in range(len(self.API.thermostats)):
             if self.API.thermostats[i]['name'] in self.thermostats:
                 self.setMode(self.modeOff, i)
+                print('setModeOff:', self.API.thermostats[i]['name'])
 
     def setModeNormal(self):
         print('setModeNormal')
@@ -889,6 +894,7 @@ class TimeOfUse:
                 mode = modes.get(self.API.thermostats[i]['name'], None)
                 if mode is not None:
                     self.setMode(mode, i)
+                    print('setModeNormal:', self.API.thermostats[i]['name'], mode)
                 else:
                     print('setModeNormal', self.API.thermostats[i]['name'],
                           'not found', modes)
