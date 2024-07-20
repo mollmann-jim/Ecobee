@@ -886,7 +886,7 @@ class TimeOfUse:
         if not self.checkActiveSeason():
             return
         self.normalTime += dt.timedelta(days = 1)
-        self.scheduler.enterabs(time.mktime(self.offTime.timetuple()), 1,
+        self.scheduler.enterabs(time.mktime(self.normalTime.timetuple()), 1,
                                 self.setModeNormal, ())
         modes = self.normalModes.get()
         for i in range(len(self.API.thermostats)):
