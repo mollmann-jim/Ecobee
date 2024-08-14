@@ -476,8 +476,9 @@ class ecobee(pyecobee.Ecobee):
         #print(dt.datetime.now(), 'getThermostatData')
 
         now = dt.datetime.now().replace(microsecond = 0)
+        fudge = frequency / 10;
         elapsed = now - ecobee.lastThermostats
-        if elapsed > frequency:
+        if elapsed > (frequency - fudge):
             ecobee.lastThermostats = now
             self.debugThermostatSkip('', now, elapsed, frequency, 'collect')
         else:
@@ -510,8 +511,9 @@ class ecobee(pyecobee.Ecobee):
 
     def getExtThermostatData(self, frequency = dt.timedelta(seconds = 1)):
         now = dt.datetime.now().replace(microsecond = 0)
+        fudge = frequency / 10;
         elapsed = now - ecobee.lastExtThermostats
-        if elapsed > frequency:
+        if elapsed > (frequency - fudge):
             ecobee.lastExtThermostats = now
             self.debugThermostatSkip('Ext', now, elapsed, frequency, 'collect')
         else:
