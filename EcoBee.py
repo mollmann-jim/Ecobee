@@ -192,7 +192,7 @@ class saveEcobeeData():
             tableR = table + 'R'
             self.c[tableR] = self.DB.cursor()            
             drop = 'DROP TABLE IF EXISTS ' + tableR + ';'
-            c[table].execute(drop)
+            self.c[tableR].execute(drop)
             '''
             database          runtimeReport column
             ----------------  ---------------------
@@ -221,7 +221,7 @@ class saveEcobeeData():
             dmOffset          dmOffset
             economizer        economizer
             '''
-            creater = 'CREATE TABLE IF NOT EXISTS ' + tableR + ' ( \n' +\
+            createR = 'CREATE TABLE IF NOT EXISTS ' + tableR + ' ( \n' +\
                 ' dataTime          TEXT PRIMARY KEY, \n' +\
                 ' temperature       REAL,             \n' +\
                 ' humidity          INTEGER,          \n' +\
@@ -992,23 +992,6 @@ def main():
     SCthermostats = ['Upstairs', 'Downstairs']
     # intialize API.thermostats
     API.getThermostatData()
-    columns = "zoneHumidity,zoneHeatTemp,zoneCoolTemp,hvacMode,"              +\
-        "compHeat1,compHeat2,auxHeat1,auxHeat2,auxHeat3,compCool1,compCool2," +\
-        "fan,outdoorHumidity,outdoorTemp,sky,wind,zoneCalendarEvent,"         +\
-        "zoneClimate,zoneHvacMode,zoneOccupancy,dmOffset,economizer"
-    resp = API.runtimeReport(2, '2024-08-16', '2024-08-16', 0, 9, columns = columns)
-    pp.pprint(API.runtimeReportData)
-    for row in API.runtimeReportData['rowList']:
-        #print(row)
-        myday, mytime, humidity, desiredHeat, desiredCool, hvacMode, heatPump1, \
-        heatPump2, auxHeat1, auxHeat2, auxHeat3, cool1, cool2, fan, \
-        outdoorHumidity, outdoorTemp, sky, wind, zoneCalendarEvent, zoneClimate, \
-        zoneHvacMode, zoneOccupancy, dmOffset, economizer = row.split(",")
-        date_str = str(myday) + " " + str(mytime)
-        datetime_obj = dt.datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
-        print(datetime_obj, humidity, desiredCool,zoneClimate)
-         
-    z = pp / 0
     
     HVAComde = normalTermostatModes()
     NCsave = saveEcobeeData(HVAComde, thermostats = NCthermostats, where = 'NC')
@@ -1102,6 +1085,24 @@ def main():
     print('\n\n')
     NCheader.printHeaderLine(reschedule = False)
     SCheader.printHeaderLine(reschedule = False)
+    
+    columns = "zoneHumidity,zoneHeatTemp,zoneCoolTemp,hvacMode,"              +\
+        "compHeat1,compHeat2,auxHeat1,auxHeat2,auxHeat3,compCool1,compCool2," +\
+        "fan,outdoorHumidity,outdoorTemp,sky,wind,zoneCalendarEvent,"         +\
+        "zoneClimate,zoneHvacMode,zoneOccupancy,dmOffset,economizer"
+    resp = API.runtimeReport(2, '2024-08-16', '2024-08-16', 0, 9, columns = columns)
+    pp.pprint(API.runtimeReportData)
+    for row in API.runtimeReportData['rowList']:
+        #print(row)
+        myday, mytime, humidity, desiredHeat, desiredCool, hvacMode, heatPump1, \
+        heatPump2, auxHeat1, auxHeat2, auxHeat3, cool1, cool2, fan, \
+        outdoorHumidity, outdoorTemp, sky, wind, zoneCalendarEvent, zoneClimate, \
+        zoneHvacMode, zoneOccupancy, dmOffset, economizer = row.split(",")
+        date_str = str(myday) + " " + str(mytime)
+        datetime_obj = dt.datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
+        print(datetime_obj, humidity, desiredCool,zoneClimate)
+         
+    z = pp / 0
     
     scheduler.run()
 
