@@ -162,7 +162,9 @@ class saveEcobeeData():
             index  = 'CREATE INDEX IF NOT EXISTS ' + table + 'index ON ' +\
                 table + ' (statusTime);'
             self.c[table].execute(index)
+
             tableX = table + 'X'
+            self.c[tableX] = self.DB.cursor()
             createX = 'CREATE TABLE IF NOT EXISTS ' + tableX + ' ( \n' +\
                 ' lastReading     TEXT,             \n' +\
                 ' runtimeDate     TEXT,             \n' +\
@@ -182,11 +184,74 @@ class saveEcobeeData():
                 ' cool2           INTEGER,          \n' +\
                 ' fan             INTEGER           \n' +\
                 ');'
-            self.c[tableX] = self.DB.cursor()
             self.c[tableX].execute(createX)
             index  = 'CREATE INDEX IF NOT EXISTS ' + table + 'index ON ' +\
                 table + ' (dataTime);'
-            self.c[table].execute(index)
+            self.c[tableX].execute(index)
+
+            tableR = table + 'R'
+            self.c[tableR] = self.DB.cursor()            
+            drop = 'DROP TABLE IF EXISTS ' + tableR + ';'
+            c[table].execute(drop)
+            '''
+            database          runtimeReport column
+            ----------------  ---------------------
+            dataTime          
+            temperature       zoneAveTemp 
+            humidity          zoneHumidity
+            desiredHeat       zoneHeatTemp
+            desiredCool       zoneCoolTemp
+            hvacMode          hvacMode
+            heatPump1         compHeat1
+            heatPump2         compHeat2
+            auxHeat1          auxHeat1
+            auxHeat2          auxHeat2
+            auxHeat3          auxHeat3
+            cool1             compCool1
+            cool2             compCool2
+            fan               fan
+            outdoorHumidity   outdoorHumidity
+            outdoorTemp,      outdoorTemp
+            sky               sky
+            wind              wind
+            zoneCalendarEvent zoneCalendarEvent
+            zoneClimate       zoneClimate
+            zoneHvacMode      zoneHvacMode
+            zoneOccupancy     zoneOccupancy
+            dmOffset          dmOffset
+            economizer        economizer
+            '''
+            creater = 'CREATE TABLE IF NOT EXISTS ' + tableR + ' ( \n' +\
+                ' dataTime          TEXT PRIMARY KEY, \n' +\
+                ' temperature       REAL,             \n' +\
+                ' humidity          INTEGER,          \n' +\
+                ' desiredHeat       INTEGER,          \n' +\
+                ' desiredCool       INTEGER,          \n' +\
+                ' hvacMode          TEXT,             \n' +\
+                ' heatPump1         INTEGER,          \n' +\
+                ' heatPump2         INTEGER,          \n' +\
+                ' auxHeat1          INTEGER,          \n' +\
+                ' auxHeat2          INTEGER,          \n' +\
+                ' auxHeat3          INTEGER,          \n' +\
+                ' cool1             INTEGER,          \n' +\
+                ' cool2             INTEGER,          \n' +\
+                ' fan               INTEGER,          \n' +\
+                ' outdoorHumidity   INTEGER,          \n' +\
+                ' outdoorTemp,      INTEGER,          \n' +\
+                ' sky               INTEGER,          \n' +\
+                ' wind              INTEGER,          \n' +\
+                ' zoneCalendarEvent TEXT,             \n' +\
+                ' zoneClimate       TEXT,             \n' +\
+                ' zoneHvacMode      TEXT,             \n' +\
+                ' zonneOccupancy    INTEGER,          \n' +\
+                ' dmOffset          REAL,             \n' +\
+                ' economizer        INTEGER           \n' +\
+                ');'
+            self.c[tableR] = self.DB.cursor()
+            self.c[tableR].execute(createR)
+            index  = 'CREATE INDEX IF NOT EXISTS ' + table + 'index ON ' +\
+                table + ' (dataTime);'
+            self.c[tableR].execute(index)
             
         createW = 'CREATE TABLE IF NOT EXISTS Weather' + self.where + ' ( \n' +\
                 ' timestamp      INTEGER DEFAULT CURRENT_TIMESTAMP, \n' +\
@@ -927,14 +992,22 @@ def main():
     SCthermostats = ['Upstairs', 'Downstairs']
     # intialize API.thermostats
     API.getThermostatData()
-    columns = "auxHeat1,compCool1,compCool2,"     +\
-            "compHeat1,compHeat2,dmOffset,economizer,"        +\
-            "fan,hvacMode,outdoorHumidity,outdoorTemp,"         +\
-            "sky,wind,zoneAveTemp,zoneCalendarEvent,"           +\
-            "zoneClimate,zoneCoolTemp,zoneHeatTemp,zoneHumidity,"          +\
-            "zoneHvacMode,zoneOccupancy"
-    resp = API.runtimeReport(0, '2024-08-16', '2024-08-16', columns = columns)
+    columns = "zoneHumidity,zoneHeatTemp,zoneCoolTemp,hvacMode,"              +\
+        "compHeat1,compHeat2,auxHeat1,auxHeat2,auxHeat3,compCool1,compCool2," +\
+        "fan,outdoorHumidity,outdoorTemp,sky,wind,zoneCalendarEvent,"         +\
+        "zoneClimate,zoneHvacMode,zoneOccupancy,dmOffset,economizer"
+    resp = API.runtimeReport(2, '2024-08-16', '2024-08-16', 0, 9, columns = columns)
     pp.pprint(API.runtimeReportData)
+    for row in API.runtimeReportData['rowList']:
+        #print(row)
+        myday, mytime, humidity, desiredHeat, desiredCool, hvacMode, heatPump1, \
+        heatPump2, auxHeat1, auxHeat2, auxHeat3, cool1, cool2, fan, \
+        outdoorHumidity, outdoorTemp, sky, wind, zoneCalendarEvent, zoneClimate, \
+        zoneHvacMode, zoneOccupancy, dmOffset, economizer = row.split(",")
+        date_str = str(myday) + " " + str(mytime)
+        datetime_obj = dt.datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
+        print(datetime_obj, humidity, desiredCool,zoneClimate)
+         
     z = pp / 0
     
     HVAComde = normalTermostatModes()
