@@ -7,7 +7,7 @@ from dateutil.tz import tz
 import pprint
 import json
 from sys import path
-path.append('/home/jim/tools/Ecobee/')
+path.append('/home/jim/tools/Ecobee.runtimeReport/')
 import pyecobee
 import logging
 import time
@@ -26,6 +26,7 @@ def setLogging(logger):
     fh = logging.FileHandler(LOGFILE)
     fh.setLevel(logging.ERROR)
     fh.setLevel(logging.WARNING)
+    fh.setLevel(logging.DEBUG)
     #fh.setLevel(logging.DEBUG)
     # create console handler with a higher log level
     ch = logging.StreamHandler()
@@ -126,7 +127,6 @@ class saveEcobeeData():
     def __init__(self, HVACmode, thermostats = [], where = 'noWhere'):
         global DBname
         self.prevStatusTime = [0, 0, 0, 0]
-        #DBname = '/home/jim/tools/Ecobee/MBthermostat.sched.sql'
         self.thermostats = thermostats
         self.where = where
         self.DB = sqlite3.connect(DBname)
@@ -927,6 +927,16 @@ def main():
     SCthermostats = ['Upstairs', 'Downstairs']
     # intialize API.thermostats
     API.getThermostatData()
+    columns = "auxHeat1,compCool1,compCool2,"     +\
+            "compHeat1,compHeat2,dmOffset,economizer,"        +\
+            "fan,hvacMode,outdoorHumidity,outdoorTemp,"         +\
+            "sky,wind,zoneAveTemp,zoneCalendarEvent,"           +\
+            "zoneClimate,zoneCoolTemp,zoneHeatTemp,zoneHumidity,"          +\
+            "zoneHvacMode,zoneOccupancy"
+    resp = API.runtimeReport(0, '2024-08-16', '2024-08-16', columns = columns)
+    pp.pprint(API.runtimeReportData)
+    z = pp / 0
+    
     HVAComde = normalTermostatModes()
     NCsave = saveEcobeeData(HVAComde, thermostats = NCthermostats, where = 'NC')
     SCsave = saveEcobeeData(HVAComde, thermostats = SCthermostats, where = 'SC')
@@ -1019,15 +1029,15 @@ def main():
     print('\n\n')
     NCheader.printHeaderLine(reschedule = False)
     SCheader.printHeaderLine(reschedule = False)
-
+    
     scheduler.run()
 
 if 'New' in sys.argv[0]:
-    DBname  = '/home/jim/tools/Ecobee/Thermostats.New.sql'
-    LOGFILE = '/home/jim/tools/Ecobee/ecobee.New.log'
+    DBname  = '/home/jim/tools/Ecobee.runtimeReport/Thermostats.New.sql'
+    LOGFILE = '/home/jim/tools/Ecobee.runtimeReport/ecobee.New.log'
 else:
-    DBname  = '/home/jim/tools/Ecobee/Thermostats.sql'
-    LOGFILE = '/home/jim/tools/Ecobee/ecobee.log'
+    DBname  = '/home/jim/tools/Ecobee.runtimeReport/Thermostats.sql'
+    LOGFILE = '/home/jim/tools/Ecobee.runtimeReport/ecobee.log'
 
 if __name__ == '__main__':
     # want unbuffered stdout for use with "tee"

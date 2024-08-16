@@ -20,6 +20,7 @@ from .const import (
     ECOBEE_DEFAULT_TIMEOUT,
     ECOBEE_ENDPOINT_AUTH,
     ECOBEE_ENDPOINT_THERMOSTAT,
+    ECOBEE_ENDPOINT_RUNTIMEREPORT,
     ECOBEE_ENDPOINT_TOKEN,
     ECOBEE_REFRESH_TOKEN,
     ECOBEE_OPTIONS_NOTIFICATIONS,
@@ -678,6 +679,108 @@ class Ecobee(object):
         except (ExpiredTokenError, InvalidTokenError) as err:
             raise err
 
+    def RuntimeReport(self, index: int, startDate: str, endDate: str,
+                      startInverval: int = 0, endInterval: int = 287,
+                      columns: str = None) -> None:
+        allColumns = "auxHeat1,auxHeat2,auxHeat3,compCool1,compCool2,"     +\
+            "compHeat1,compHeat2,dehumidifier,dmOffset,economizer,"        +\
+            "fan,humidifier,hvacMode,outdoorHumidity,outdoorTemp,"         +\
+            "sky,ventilator,wind,zoneAveTemp,zoneCalendarEvent,"           +\
+            "zoneClimate,zoneCoolTemp,zoneHeatTemp,zoneHumidity,"          +\
+            "zoneHumidityHigh,zoneHumidityLow,zoneHvacMode,zoneOccupancy"
+        defaultColumns = "auxHeat1,auxHeat2,auxHeat3,compCool1,compCool2," +\
+            "fan,hvacMode,outdoorHumidity,outdoorTemp,sky,wind,"           +\
+            "zoneAveTemp,zone,CalendarEvent,zoneClimate,zoneCoolTemp,"      +\
+            "zoneHeatTemp,zoneHumidity,zoneHumidityHigh,zoneHumidityLow,"  +\
+            "zoneHvacMode"
+        defaultColumns = "zoneAveTemp,zoneHumidity,outdoorTemp,outdoorHumidity"
+        if columns is None:
+            columns = defaultColumns
+        
+        body = {
+            "selection": {
+                "selectionType": "thermostats",
+                "selectionMatch": self.thermostats[index]["identifier"],
+            },
+            "startDate":startDate,
+            "endDate":endDate,
+            "startInverval":startInverval,
+            "endInterval":endInterval,
+            "columns":columns,
+        }
+        #if self.include_notifications:
+        #    body["selection"]["includeNotificationSettings"] = self.include_notifications
+        #body = {"json": json.dumps(body)}
+        body = json.dumps(body)
+        log_msg_action = "runtimeReport"
+
+        if True:
+            print('\nruntimeReport:index:', index, 'start:', startDate, 'end:', endDate)
+            print('\nruntimeReport:interval:', startInverval, endInterval)
+            print('\nruntimeReport:columns:', columns)
+            print('\nnuntimeReport:body:', body)
+            print('\n')
+            
+        response = self._request(
+            "GET", ECOBEE_ENDPOINT_RUNTIMEREPORT + "?format=json&body=", log_msg_action, body=body
+        )
+        print(response)
+        try:
+            self.runtimeReport = response["thermostatList"]
+            return True
+        except (KeyError, TypeError):
+            return False
+
+    def runtimeReport(self, index: int, startDate: str, endDate: str,
+                      startInverval: int = 0, endInterval: int = 287,
+                      columns: str = None) -> None:
+        allColumns = "auxHeat1,auxHeat2,auxHeat3,compCool1,compCool2,"     +\
+            "compHeat1,compHeat2,dehumidifier,dmOffset,economizer,"        +\
+            "fan,humidifier,hvacMode,outdoorHumidity,outdoorTemp,"         +\
+            "sky,ventilator,wind,zoneAveTemp,zoneCalendarEvent,"           +\
+            "zoneClimate,zoneCoolTemp,zoneHeatTemp,zoneHumidity,"          +\
+            "zoneHumidityHigh,zoneHumidityLow,zoneHvacMode,zoneOccupancy"
+        defaultColumns = "auxHeat1,auxHeat2,auxHeat3,compCool1,compCool2," +\
+            "fan,hvacMode,outdoorHumidity,outdoorTemp,sky,wind,"           +\
+            "zoneAveTemp,zone,CalendarEvent,zoneClimate,zoneCoolTemp,"      +\
+            "zoneHeatTemp,zoneHumidity,zoneHumidityHigh,zoneHumidityLow,"  +\
+            "zoneHvacMode"
+        defaultColumns = "zoneAveTemp,zoneHumidity,outdoorTemp,outdoorHumidity"
+        if columns is None:
+            columns = defaultColumns
+        
+        payload = {
+            "selection": {
+                "selectionType": "thermostats",
+                "selectionMatch": self.thermostats[index]["identifier"],
+            },
+            "startDate":startDate,         "endDate":endDate,
+            "startInverval":startInverval, "endInterval":endInterval,
+            "columns":columns,
+        }
+        payload = json.dumps(payload)
+        log_msg_action = "runtimeReport"
+        
+        if False:
+            print('\nruntimeReport:index:', index, 'start:', startDate, 'end:', endDate)
+            print('\nruntimeReport:interval:', startInverval, endInterval)
+            print('\nruntimeReport:columns:', columns)
+            print('\nnuntimeReport:payload:', payload)
+            print('\n')
+            
+        response = self._request(
+            "GET", ECOBEE_ENDPOINT_RUNTIMEREPORT + "?format=json&body=", log_msg_action,
+            payload=payload
+        )
+        #print('response:',response)
+        #print('response.rowlist:', response["rowList"])
+        #return response['reportList'][0]
+        try:
+            self.runtimeReportData = response['reportList'][0]
+            return True
+        except (KeyError, TypeError):
+            return False
+
     def _request(
         self,
         method: str,
@@ -685,6 +788,7 @@ class Ecobee(object):
         log_msg_action: str,
         params: dict = None,
         body: dict = None,
+        payload: str = '',
         auth_request: bool = False,
         retrying: bool = False
     ) -> Optional[str]:
@@ -694,6 +798,9 @@ class Ecobee(object):
 
         if not auth_request:
             url = f"{ECOBEE_BASE_URL}/{ECOBEE_API_VERSION}/{endpoint}"
+            if payload is not None:
+                #print('payload:', payload)
+                url = url + payload
             headers = {
                 "Content-Type": "application/json;charset=UTF-8",
                 "Authorization": f"Bearer {self.access_token}",
