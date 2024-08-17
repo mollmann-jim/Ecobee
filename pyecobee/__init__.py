@@ -880,6 +880,7 @@ class Ecobee(object):
                             log_msg_action,
                             params,
                             body,
+                            payload,
                             auth_request,
                             retrying = True
                         )
