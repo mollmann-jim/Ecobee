@@ -772,23 +772,19 @@ class collectThermostatData:
         self.starttime = 0
         self.backupMode = backupMode()
         
-    def Schedule(self, Getter, Saver, API, args = None,
-                 days = 0, hours = 0, minutes = 0, seconds = 0):
-        self.frequency = dt.timedelta(days = days, hours = hours,
-                                      minutes = minutes, seconds = seconds)
+    def Schedule(self, Getter, Saver, API, hours = 0, minutes = 0, seconds = 0):
+        self.frequency = dt.timedelta(hours = hours, minutes = minutes, seconds = seconds)
         self.Getter    = Getter
         self.Saver     = Saver
         self.API       = API
-        self.args      = args
         now = dt.datetime.now()
-        firstTime = now.replace(hour = 0, minute = 0, second = 0, microsecond = 0) - \
+        firstTime = now.replace(hour = 0, minute = 0, second = 0, microsecond = 0) -\
                     dt.timedelta(weeks = 1)
         while firstTime < now:
             firstTime += self.frequency
         self.starttime = firstTime
         #print('Schedule Start time:', self.starttime)
-        self.scheduler.enterabs(time.mktime(self.starttime.timetuple()), 1,
-                                self.Collector, (self.args))
+        self.scheduler.enterabs(time.mktime(self.starttime.timetuple()), 1, self.Collector, ())
 
     def Collector(self):
         # reschedule
@@ -800,6 +796,49 @@ class collectThermostatData:
         self.Getter(frequency = self.frequency)
         self.Saver(self.API)
 
+    def runTSchedule(self, Getter, Saver, API, kwargs = None,
+                     dayOfMonth = None, hour = 0, minute = 0,
+                     days = 0, hours = 0, minutes = 0, seconds = 0):
+        self.frequency = dt.timedelta(days = days, hours = hours,
+                                      minutes = minutes, seconds = seconds)
+        self.Getter     = Getter
+        self.Saver      = Saver
+        self.API        = API
+        self.kwargs     = kwargs
+        self.dayOfMonth = dayOfMonth
+        self.hour       = hour
+        self.minute     = minute
+        now = dt.datetime.now()
+        print(self.dayOfMonth, dayOfMonth)
+        if self.dayOfMonth == None:
+            firstTime = now.replace(hour = self.hour, minute = self.minute,
+                                    second = 0, microsecond = 0) - \
+                                    dt.timedelta(weeks = 1)
+            while firstTime < now:
+                firstTime += self.frequency
+        else:
+            firstTime = now.replace(day = self.dayOfMonth,
+                                    hour = self.hour, minute = self.minute,
+                                    second = 0, microsecond = 0) - \
+                                    relativedelta(months = 1)
+            while firstTime < now:
+                firstTime += relativedelta(months = 1)
+        self.starttime = firstTime
+        print('Schedule Start time:', self.starttime, self.kwargs)
+        self.scheduler.enterabs(time.mktime(self.starttime.timetuple()), 1,
+                                    self.Collector, (), kwargs = self.kwargs)
+            
+    def runTCollector(self):
+        # reschedule
+        self.starttime = self.starttime + self.frequency
+        self.scheduler.enterabs(time.mktime(self.starttime.timetuple()), 1,
+                                self.runTCollector, (), kwargs = self.kwargs)
+        if self.backupMode.active():
+            print('backupMode.active: skipping Collector')
+            return
+        self.Getter(frequency = self.frequency)
+        self.Saver(self.API)
+        
 class deHumidify:
     def __init__(self, scheduler, thermostats = [], where = 'noWhere'):
         self.scheduler = scheduler
@@ -1044,14 +1083,19 @@ def main():
     NCweather.Schedule(API.getWeather, NCsave.WeatherData, API, minutes = 25)
     SCweather.Schedule(API.getWeather, SCsave.WeatherData, API, minutes = 25)
     
-    NCrunttimeReportData = collectThermostatData(scheduler)
-    SCrunttimeReportData = collectThermostatData(scheduler)
-    NCrunttimeReportData.Schedule(API.getRuntimeReportData,
-                                  NCsave.RuntimeReportData,
-                                  API, days = 1)
-    SCrunttimeReportData.Schedule(API.getRuntimeReportData,
-                                  SCsave.RuntimeReportData,
-                                  API, days = 1)
+    runttimeReportData = collectThermostatData(scheduler)
+    runttimeReportData.runTSchedule(API.getRuntimeReportData,
+                                    NCsave.RuntimeReportData,
+                                    API, days = 1, hour = 3, kwargs = {'dataDays' : 1})
+    runttimeReportData.runTSchedule(API.getRuntimeReportData,
+                                    NCsave.RuntimeReportData,
+                                    API, dayOfMonth = 10, kwargs = {'dataDays' : 14})
+    runttimeReportData.runTSchedule(API.getRuntimeReportData,
+                                    NCsave.RuntimeReportData,
+                                    API, dayOfMonth = 20, kwargs = {'dataDays' : 14})
+    runttimeReportData.runTSchedule(API.getRuntimeReportData,
+                                    NCsave.RuntimeReportData,
+                                    API, dayOfMonth = 2,  kwargs = {'dataDays' : 30})
     
     NCprint  = fdPrint(7)
     SCprint  = fdPrint(8)
@@ -1129,15 +1173,17 @@ def main():
         "zoneClimate,zoneHvacMode,zoneOccupancy,dmOffset,economizer"
     resp = API.runtimeReport(list(range(4)), '2024-08-16', '2024-08-16', 0, 9, columns = columns)
     pp.pprint(API.runtimeReportData)
-    for row in API.runtimeReportData['rowList']:
-        #print(row)
-        myday, mytime, humidity, desiredHeat, desiredCool, hvacMode, heatPump1, \
-        heatPump2, auxHeat1, auxHeat2, auxHeat3, cool1, cool2, fan, \
-        outdoorHumidity, outdoorTemp, sky, wind, zoneCalendarEvent, zoneClimate, \
-        zoneHvacMode, zoneOccupancy, dmOffset, economizer = row.split(",")
-        date_str = str(myday) + " " + str(mytime)
-        datetime_obj = dt.datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
-        print(datetime_obj, humidity, desiredCool,zoneClimate)
+    for thermo in range(len(API.runtimeReportData)):
+        print(thermo)
+        for row in range(len(API.runtimeReportData[thermo]['rowList'])):
+            myday, mytime, humidity, desiredHeat, desiredCool, hvacMode, heatPump1, \
+                heatPump2, auxHeat1, auxHeat2, auxHeat3, cool1, cool2, fan, \
+                outdoorHumidity, outdoorTemp, sky, wind, zoneCalendarEvent, zoneClimate, \
+                zoneHvacMode, zoneOccupancy, dmOffset, economizer = \
+                    API.runtimeReportData[thermo]['rowList'][row].split(",")
+            date_str = str(myday) + " " + str(mytime)
+            datetime_obj = dt.datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
+            print(datetime_obj, humidity, desiredCool,zoneClimate)
          
     z = pp / 0
     
