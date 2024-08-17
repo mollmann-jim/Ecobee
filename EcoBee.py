@@ -505,6 +505,9 @@ class saveEcobeeData():
                   sky]
         self.c['Weather'].execute(insert, values)
         self.DB.commit()
+
+    def RuntimeReportData(self, API):
+        print('RuntimeReportData')
     
             
 class ecobee(pyecobee.Ecobee):
@@ -591,6 +594,25 @@ class ecobee(pyecobee.Ecobee):
         #print(dt.datetime.now(), 'getWeather')
         pass
 
+    def getRuntimeReportData(self, elapsed = 1, endDate = None):
+        print('ecobee:getRuntimeReport:', thermostat, elapsed, endDate)
+        if endDate is None:
+            endDate = date.today()
+        startDate = endDate - timeDelta(days = (elapsed - 1))
+        endDate  = endDate.isoformat()
+        startDate = startDate.isoformat()
+        columns = "zoneHumidity,zoneHeatTemp,zoneCoolTemp,hvacMode,"              +\
+            "compHeat1,compHeat2,auxHeat1,auxHeat2,auxHeat3,compCool1,compCool2," +\
+            "fan,outdoorHumidity,outdoorTemp,sky,wind,zoneCalendarEvent,"         +\
+            "zoneClimate,zoneHvacMode,zoneOccupancy,dmOffset,economizer"
+        thermoList = list(range(len(self.thermostats)))              
+        rc = self.runtimeReport(thermoList, startDate, endDate, columns = columns)
+        print('ecobee:getRuntimeReport:', startDate, endDate, rc)
+        if rc:
+            rows = self.runtimeReportData['reportList'][0]['rowCount']
+        else:
+            rows = -1
+        return rows
         
     def dumpEcobee(self):
         print('thermostats:', self.thermostats)
@@ -750,19 +772,23 @@ class collectThermostatData:
         self.starttime = 0
         self.backupMode = backupMode()
         
-    def Schedule(self, Getter, Saver, API, hours = 0, minutes = 0, seconds = 0):
-        self.frequency = dt.timedelta(hours = hours, minutes = minutes, seconds = seconds)
+    def Schedule(self, Getter, Saver, API, args = None,
+                 days = 0, hours = 0, minutes = 0, seconds = 0):
+        self.frequency = dt.timedelta(days = days, hours = hours,
+                                      minutes = minutes, seconds = seconds)
         self.Getter    = Getter
         self.Saver     = Saver
         self.API       = API
+        self.args      = args
         now = dt.datetime.now()
-        firstTime = now.replace(hour = 0, minute = 0, second = 0, microsecond = 0) -\
+        firstTime = now.replace(hour = 0, minute = 0, second = 0, microsecond = 0) - \
                     dt.timedelta(weeks = 1)
         while firstTime < now:
             firstTime += self.frequency
         self.starttime = firstTime
         #print('Schedule Start time:', self.starttime)
-        self.scheduler.enterabs(time.mktime(self.starttime.timetuple()), 1, self.Collector, ())
+        self.scheduler.enterabs(time.mktime(self.starttime.timetuple()), 1,
+                                self.Collector, (self.args))
 
     def Collector(self):
         # reschedule
@@ -990,13 +1016,15 @@ def main():
     API.read_config_from_file()
     NCthermostats = ['Loft', 'LivingRoom']
     SCthermostats = ['Upstairs', 'Downstairs']
+    Allthermostats = NCthermostats + SCthermostats
     # intialize API.thermostats
     API.getThermostatData()
     
-    HVAComde = normalTermostatModes()
-    NCsave = saveEcobeeData(HVAComde, thermostats = NCthermostats, where = 'NC')
-    SCsave = saveEcobeeData(HVAComde, thermostats = SCthermostats, where = 'SC')
-    HVAComde.getSaved(SCsave.getSavedHVACmodes)
+    HVACmode = normalTermostatModes()
+    NCsave = saveEcobeeData(HVACmode, thermostats = NCthermostats, where = 'NC')
+    SCsave = saveEcobeeData(HVACmode, thermostats = SCthermostats, where = 'SC')
+    RunRptsave = saveEcobeeData(HVACmode, thermostats = Allthermostats, where = 'All')
+    HVACmode.getSaved(SCsave.getSavedHVACmodes)
 
     # Build a scheduler object that will look at absolute times
     scheduler = sched.scheduler(time.time, time.sleep)
@@ -1015,6 +1043,15 @@ def main():
     SCweather = collectThermostatData(scheduler)
     NCweather.Schedule(API.getWeather, NCsave.WeatherData, API, minutes = 25)
     SCweather.Schedule(API.getWeather, SCsave.WeatherData, API, minutes = 25)
+    
+    NCrunttimeReportData = collectThermostatData(scheduler)
+    SCrunttimeReportData = collectThermostatData(scheduler)
+    NCrunttimeReportData.Schedule(API.getRuntimeReportData,
+                                  NCsave.RuntimeReportData,
+                                  API, days = 1)
+    SCrunttimeReportData.Schedule(API.getRuntimeReportData,
+                                  SCsave.RuntimeReportData,
+                                  API, days = 1)
     
     NCprint  = fdPrint(7)
     SCprint  = fdPrint(8)
@@ -1047,7 +1084,7 @@ def main():
         SCdehumidify.Schedule(API, SCstatus.addLine, startHour = 4,
                               startMinute = 50, duration = 60)
     
-    SCTimeOfUseSummer = TimeOfUse(scheduler, HVAComde, thermostats = SCthermostats,
+    SCTimeOfUseSummer = TimeOfUse(scheduler, HVACmode, thermostats = SCthermostats,
                                   printer = SCprint)
     SCTimeOfUseSummer.setDates(startMonth = 4, startDay = 1, endMonth = 10,
                                endDay = 31)
@@ -1061,7 +1098,7 @@ def main():
         SCTimeOfUseSummer.Schedule(API, offHour = S.hour , offMinute = S.minute ,
                                    normalHour = E.hour , normalMinute = E.minute)
 
-    SCTimeOfUseWinter = TimeOfUse(scheduler, HVAComde, thermostats = SCthermostats,
+    SCTimeOfUseWinter = TimeOfUse(scheduler, HVACmode, thermostats = SCthermostats,
                                   printer = SCprint)
     SCTimeOfUseWinter.setDates(startMonth = 11, startDay = 1, endMonth = 3, endDay = 31)
     SCTimeOfUseWinter.Schedule(API, offHour = 6, offMinute = 0, normalHour = 9,
@@ -1090,7 +1127,7 @@ def main():
         "compHeat1,compHeat2,auxHeat1,auxHeat2,auxHeat3,compCool1,compCool2," +\
         "fan,outdoorHumidity,outdoorTemp,sky,wind,zoneCalendarEvent,"         +\
         "zoneClimate,zoneHvacMode,zoneOccupancy,dmOffset,economizer"
-    resp = API.runtimeReport(2, '2024-08-16', '2024-08-16', 0, 9, columns = columns)
+    resp = API.runtimeReport(list(range(4)), '2024-08-16', '2024-08-16', 0, 9, columns = columns)
     pp.pprint(API.runtimeReportData)
     for row in API.runtimeReportData['rowList']:
         #print(row)

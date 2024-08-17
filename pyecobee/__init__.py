@@ -731,7 +731,7 @@ class Ecobee(object):
         except (KeyError, TypeError):
             return False
 
-    def runtimeReport(self, index: int, startDate: str, endDate: str,
+    def runtimeReport(self, thermostats, startDate: str, endDate: str,
                       startInverval: int = 0, endInterval: int = 287,
                       columns: str = None) -> None:
         allColumns = "auxHeat1,auxHeat2,auxHeat3,compCool1,compCool2,"     +\
@@ -748,11 +748,15 @@ class Ecobee(object):
         defaultColumns = "zoneAveTemp,zoneHumidity,outdoorTemp,outdoorHumidity"
         if columns is None:
             columns = defaultColumns
-        
+
+        thermoNames = ''
+        for index in thermostats:
+            thermoNames +=  self.thermostats[index]["identifier"]+ ','
+        thermoNames = thermoNames[0 : (len(thermoNames) - 1)]
         payload = {
             "selection": {
                 "selectionType": "thermostats",
-                "selectionMatch": self.thermostats[index]["identifier"],
+                "selectionMatch": thermoNames,
             },
             "startDate":startDate,         "endDate":endDate,
             "startInverval":startInverval, "endInterval":endInterval,
@@ -776,7 +780,7 @@ class Ecobee(object):
         #print('response.rowlist:', response["rowList"])
         #return response['reportList'][0]
         try:
-            self.runtimeReportData = response['reportList'][0]
+            self.runtimeReportData = response['reportList']
             return True
         except (KeyError, TypeError):
             return False
@@ -788,7 +792,7 @@ class Ecobee(object):
         log_msg_action: str,
         params: dict = None,
         body: dict = None,
-        payload: str = '',
+        payload: str = None,
         auth_request: bool = False,
         retrying: bool = False
     ) -> Optional[str]:
@@ -799,7 +803,7 @@ class Ecobee(object):
         if not auth_request:
             url = f"{ECOBEE_BASE_URL}/{ECOBEE_API_VERSION}/{endpoint}"
             if payload is not None:
-                #print('payload:', payload)
+                print('payload:', payload, 'url:', url)
                 url = url + payload
             headers = {
                 "Content-Type": "application/json;charset=UTF-8",
