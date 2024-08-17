@@ -817,6 +817,7 @@ class collectThermostatData:
             while firstTime < now:
                 firstTime += self.frequency
         else:
+            self.frequency = dt.timedelta(days = 28)   # not needed?
             firstTime = now.replace(day = self.dayOfMonth,
                                     hour = self.hour, minute = self.minute,
                                     second = 0, microsecond = 0) - \
@@ -830,7 +831,10 @@ class collectThermostatData:
             
     def runTCollector(self):
         # reschedule
-        self.starttime = self.starttime + self.frequency
+        if self.dayOfMonth == None:
+            self.starttime += self.frequency
+        else:
+            self.starttime += relativedelta(months = 1)
         self.scheduler.enterabs(time.mktime(self.starttime.timetuple()), 1,
                                 self.runTCollector, (), kwargs = self.kwargs)
         if self.backupMode.active():
@@ -1062,7 +1066,7 @@ def main():
     HVACmode = normalTermostatModes()
     NCsave = saveEcobeeData(HVACmode, thermostats = NCthermostats, where = 'NC')
     SCsave = saveEcobeeData(HVACmode, thermostats = SCthermostats, where = 'SC')
-    RunRptsave = saveEcobeeData(HVACmode, thermostats = Allthermostats, where = 'All')
+    rRsave = saveEcobeeData(HVACmode, thermostats = Allthermostats, where = 'All')
     HVACmode.getSaved(SCsave.getSavedHVACmodes)
 
     # Build a scheduler object that will look at absolute times
@@ -1083,19 +1087,21 @@ def main():
     NCweather.Schedule(API.getWeather, NCsave.WeatherData, API, minutes = 25)
     SCweather.Schedule(API.getWeather, SCsave.WeatherData, API, minutes = 25)
     
-    runttimeReportData = collectThermostatData(scheduler)
-    runttimeReportData.runTSchedule(API.getRuntimeReportData,
-                                    NCsave.RuntimeReportData,
-                                    API, days = 1, hour = 3, kwargs = {'dataDays' : 1})
-    runttimeReportData.runTSchedule(API.getRuntimeReportData,
-                                    NCsave.RuntimeReportData,
-                                    API, dayOfMonth = 10, kwargs = {'dataDays' : 14})
-    runttimeReportData.runTSchedule(API.getRuntimeReportData,
-                                    NCsave.RuntimeReportData,
-                                    API, dayOfMonth = 20, kwargs = {'dataDays' : 14})
-    runttimeReportData.runTSchedule(API.getRuntimeReportData,
-                                    NCsave.RuntimeReportData,
-                                    API, dayOfMonth = 2,  kwargs = {'dataDays' : 30})
+    rRDaily = collectThermostatData(scheduler)
+    rRDaily.runTSchedule(API.getRuntimeReportData, rRsave.RuntimeReportData,
+                                   API, days = 1, hour = 3, kwargs = {'dataDays' : 1})
+    rR14th = collectThermostatData(scheduler)
+    rR14th.runTSchedule(API.getRuntimeReportData, rRsave.RuntimeReportData,
+                        API, dayOfMonth = 14, hour = 2, kwargs = {'dataDays' : 18})
+    rR28th = collectThermostatData(scheduler)
+    rR28th.runTSchedule(API.getRuntimeReportData, rRsave.RuntimeReportData,
+                       API, dayOfMonth = 28, hour = 2, kwargs = {'dataDays' : 16})
+    rRmonthly = collectThermostatData(scheduler)
+    rRmonthly.runTSchedule(API.getRuntimeReportData, rRsave.RuntimeReportData,
+                           API, dayOfMonth = 2, hour = 1, kwargs = {'dataDays' : 32})
+    rRAll = collectThermostatData(scheduler)
+    rRAll.runTSchedule(API.getRuntimeReportData, rRsave.RuntimeReportData,
+                       API, dayOfMonth = 23, hour = 1, kwargs = {'dataDays' : 9999})
     
     NCprint  = fdPrint(7)
     SCprint  = fdPrint(8)
