@@ -507,11 +507,13 @@ class saveEcobeeData():
         self.DB.commit()
 
     def RuntimeReportData(self, API, startDate, endDate):
-        print('saveEcobeeData.RuntimeReportData:', startDate, endDate, '\n')
+        rows0 =  API.runtimeReportData[0]['rowCount']
+        print('saveEcobeeData.RuntimeReportData:', startDate, endDate, 'rows:', rows0, '\n')
         for i in range(len(API.runtimeReportData)):
             found = False
+            myID = API.runtimeReportData[i]['thermostatIdentifier']
             for j in range(len(API.thermostats)):
-                if API.thermostats[j]['identifier'] == API.runtimeReportData[i]['thermostatIdentifier']:
+                if API.thermostats[j]['identifier'] == myID:
                     thermoName = API.thermostats[j]['name']
                     table = thermoName + 'R'
                     found = True
@@ -520,7 +522,30 @@ class saveEcobeeData():
                 print('unable to find thermostat ', API.runtimeReportData[i]['thermostatIdentifier'])
             myRunt = API.runtimeReportData[i]['rowList']
             for row in myRunt:
-                print(row)
+                myday, mytime, temperature, humidity, desiredHeat, desiredCool, \
+                hvacMode, heatPump1, heatPump2, auxHeat1, auxHeat2, auxHeat3,   \
+                cool1, cool2, fan, outdoorHumidity, outdoorTemp, sky, wind,     \
+                zoneCalendarEvent, zoneClimate, zoneHvacMode, zonneOccupancy,   \
+                dmOffset, economizer = row.split(",")
+                date_str = str(myday) + " " + str(mytime)
+                dataTime = dt.datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
+                values = [dataTime, temperature, humidity, desiredHeat, desiredCool,
+                          hvacMode, heatPump1, heatPump2, auxHeat1, auxHeat2, auxHeat3,
+                          cool1, cool2, fan, outdoorHumidity, outdoorTemp, sky, wind,
+                          zoneCalendarEvent, zoneClimate, zoneHvacMode, zonneOccupancy,
+                          dmOffset, economizer]
+                insert = 'INSERT OR REPLACE INTO ' + table + ' ( \n' \
+                    'dataTime, temperature, humidity, desiredHeat, desiredCool,     \n' \
+                    'hvacMode, heatPump1, heatPump2, auxHeat1, auxHeat2, auxHeat3,  \n' \
+                    'cool1, cool2, fan, outdoorHumidity, outdoorTemp, sky, wind,    \n' \
+                    'zoneCalendarEvent, zoneClimate, zoneHvacMode, zonneOccupancy,  \n' \
+                    'dmOffset, economizer )                                         \n' \
+                    'VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '     \
+                    '?, ?, ?, ?, ?, ?);'
+                self.c[table].execute(insert, values)
+                self.DB.commit()
+                if i == 4:
+                    print(dataTime, temperature, humidity, outdoorTemp, zoneClimate, zoneHvacMode)
     
             
 class ecobee(pyecobee.Ecobee):
@@ -612,6 +637,10 @@ class ecobee(pyecobee.Ecobee):
         endDate  = endDate.isoformat()
         startDate = startDate.isoformat()
         columns = "zoneHumidity,zoneHeatTemp,zoneCoolTemp,hvacMode,"              +\
+            "compHeat1,compHeat2,auxHeat1,auxHeat2,auxHeat3,compCool1,compCool2," +\
+            "fan,outdoorHumidity,outdoorTemp,sky,wind,zoneCalendarEvent,"         +\
+            "zoneClimate,zoneHvacMode,zoneOccupancy,dmOffset,economizer"
+        columns = "zoneAveTemp,zoneHumidity,zoneHeatTemp,zoneCoolTemp,hvacMode,"  +\
             "compHeat1,compHeat2,auxHeat1,auxHeat2,auxHeat3,compCool1,compCool2," +\
             "fan,outdoorHumidity,outdoorTemp,sky,wind,zoneCalendarEvent,"         +\
             "zoneClimate,zoneHvacMode,zoneOccupancy,dmOffset,economizer"
@@ -837,9 +866,9 @@ class collectThermostatData:
         print('event:', ev)
             
     def runTCollector(self, dataDays):
-        MaxReqDays = 2
+        MaxReqDays = 30
         maxReqDays = dt.timedelta(days = MaxReqDays)
-        pause =      dt.timedelta(seconds = 10)
+        pause =      dt.timedelta(seconds = 30)
         oneDay =     dt.timedelta(days = 1)
         # reschedule
         if self.dayOfMonth == None:
@@ -1127,7 +1156,7 @@ def main():
     
     rRTest = collectThermostatData(scheduler)
     rRTest.runTSchedule(API.getRuntimeReportData, rRsave.RuntimeReportData,
-                        API, seconds = 30, dataDays = 0)
+                        API, seconds = 30, dataDays = 400)
     '''                    
     rRDaily = collectThermostatData(scheduler)
     rRDaily.runTSchedule(API.getRuntimeReportData, rRsave.RuntimeReportData,
