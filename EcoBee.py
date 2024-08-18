@@ -506,8 +506,21 @@ class saveEcobeeData():
         self.c['Weather'].execute(insert, values)
         self.DB.commit()
 
-    def RuntimeReportData(self, API):
-        print('RuntimeReportData')
+    def RuntimeReportData(self, API, startDate, endDate):
+        print('saveEcobeeData.RuntimeReportData:', startDate, endDate, '\n')
+        for i in range(len(API.runtimeReportData)):
+            found = False
+            for j in range(len(API.thermostats)):
+                if API.thermostats[j]['identifier'] == API.runtimeReportData[i]['thermostatIdentifier']:
+                    thermoName = API.thermostats[j]['name']
+                    table = thermoName + 'R'
+                    found = True
+                    break
+            if not found:
+                print('unable to find thermostat ', API.runtimeReportData[i]['thermostatIdentifier'])
+            myRunt = API.runtimeReportData[i]['rowList']
+            for row in myRunt:
+                print(row)
     
             
 class ecobee(pyecobee.Ecobee):
@@ -594,11 +607,8 @@ class ecobee(pyecobee.Ecobee):
         #print(dt.datetime.now(), 'getWeather')
         pass
 
-    def getRuntimeReportData(self, elapsed = 1, endDate = None):
-        print('ecobee:getRuntimeReport:', thermostat, elapsed, endDate)
-        if endDate is None:
-            endDate = date.today()
-        startDate = endDate - timeDelta(days = (elapsed - 1))
+    def getRuntimeReportData(self, startDate, endDate):
+        #print('ecobee:getRuntimeReportData:', startDate, endDate)
         endDate  = endDate.isoformat()
         startDate = startDate.isoformat()
         columns = "zoneHumidity,zoneHeatTemp,zoneCoolTemp,hvacMode,"              +\
@@ -608,11 +618,7 @@ class ecobee(pyecobee.Ecobee):
         thermoList = list(range(len(self.thermostats)))              
         rc = self.runtimeReport(thermoList, startDate, endDate, columns = columns)
         print('ecobee:getRuntimeReport:', startDate, endDate, rc)
-        if rc:
-            rows = self.runtimeReportData['reportList'][0]['rowCount']
-        else:
-            rows = -1
-        return rows
+        return rc
         
     def dumpEcobee(self):
         print('thermostats:', self.thermostats)
@@ -796,7 +802,7 @@ class collectThermostatData:
         self.Getter(frequency = self.frequency)
         self.Saver(self.API)
 
-    def runTSchedule(self, Getter, Saver, API, kwargs = None,
+    def runTSchedule(self, Getter, Saver, API, dataDays = 1,
                      dayOfMonth = None, hour = 0, minute = 0,
                      days = 0, hours = 0, minutes = 0, seconds = 0):
         self.frequency = dt.timedelta(days = days, hours = hours,
@@ -804,12 +810,12 @@ class collectThermostatData:
         self.Getter     = Getter
         self.Saver      = Saver
         self.API        = API
-        self.kwargs     = kwargs
         self.dayOfMonth = dayOfMonth
+        self.endDate    = None
         self.hour       = hour
         self.minute     = minute
         now = dt.datetime.now()
-        print(self.dayOfMonth, dayOfMonth)
+        print(self.dayOfMonth, dayOfMonth, dataDays)
         if self.dayOfMonth == None:
             firstTime = now.replace(hour = self.hour, minute = self.minute,
                                     second = 0, microsecond = 0) - \
@@ -825,23 +831,55 @@ class collectThermostatData:
             while firstTime < now:
                 firstTime += relativedelta(months = 1)
         self.starttime = firstTime
-        print('Schedule Start time:', self.starttime, self.kwargs)
-        self.scheduler.enterabs(time.mktime(self.starttime.timetuple()), 1,
-                                    self.Collector, (), kwargs = self.kwargs)
+        print('Schedule Start time:', self.starttime, dataDays)
+        ev = self.scheduler.enterabs(time.mktime(self.starttime.timetuple()), 1,
+                                    self.runTCollector, (dataDays,))
+        print('event:', ev)
             
-    def runTCollector(self):
+    def runTCollector(self, dataDays):
+        MaxReqDays = 2
+        maxReqDays = dt.timedelta(days = MaxReqDays)
+        pause =      dt.timedelta(seconds = 10)
+        oneDay =     dt.timedelta(days = 1)
         # reschedule
         if self.dayOfMonth == None:
             self.starttime += self.frequency
         else:
             self.starttime += relativedelta(months = 1)
+        '''
         self.scheduler.enterabs(time.mktime(self.starttime.timetuple()), 1,
-                                self.runTCollector, (), kwargs = self.kwargs)
+                                self.runTCollector, argument = (dataDays,))
+        '''
         if self.backupMode.active():
             print('backupMode.active: skipping Collector')
             return
-        self.Getter(frequency = self.frequency)
-        self.Saver(self.API)
+        
+        if self.endDate is None:
+            self.endDate   = dt.date.today()
+            self.startDate = None
+        if dataDays <= MaxReqDays:
+            self.startDate = self.endDate - dt.timedelta(days = dataDays)
+            print('runTCollector:endDate:X:', self.startDate, self.endDate, dataDays)
+            self.Getter(self.startDate, self.endDate)
+            self.Saver(self.API, self.startDate, self.endDate)
+            self.startDate = self.endDate = None
+            z = dataDays / 0
+        else:
+            if self.startDate is None:
+                self.startDate = self.endDate - maxReqDays
+                print('runTCollector:endDate:Z:', self.startDate, self.endDate, dataDays)
+            else:
+                self.endDate = self.startDate - oneDay
+                self.startDate = self.endDate - maxReqDays
+            #print('runTCollector:endDate:Z:', self.startDate, self.endDate, dataDays)
+            self.Getter(self.startDate, self.endDate)
+            self.Saver(self.API, self.startDate, self.endDate)
+            self.starttime += pause
+            dataDays -= MaxReqDays
+            self.scheduler.enterabs(time.mktime(self.starttime.timetuple()), 1,
+                                    self.runTCollector, (dataDays,))
+            
+            
         
 class deHumidify:
     def __init__(self, scheduler, thermostats = [], where = 'noWhere'):
@@ -1087,6 +1125,10 @@ def main():
     NCweather.Schedule(API.getWeather, NCsave.WeatherData, API, minutes = 25)
     SCweather.Schedule(API.getWeather, SCsave.WeatherData, API, minutes = 25)
     
+    rRTest = collectThermostatData(scheduler)
+    rRTest.runTSchedule(API.getRuntimeReportData, rRsave.RuntimeReportData,
+                        API, seconds = 30, dataDays = 0)
+    '''                    
     rRDaily = collectThermostatData(scheduler)
     rRDaily.runTSchedule(API.getRuntimeReportData, rRsave.RuntimeReportData,
                                    API, days = 1, hour = 3, kwargs = {'dataDays' : 1})
@@ -1102,7 +1144,7 @@ def main():
     rRAll = collectThermostatData(scheduler)
     rRAll.runTSchedule(API.getRuntimeReportData, rRsave.RuntimeReportData,
                        API, dayOfMonth = 23, hour = 1, kwargs = {'dataDays' : 9999})
-    
+    '''
     NCprint  = fdPrint(7)
     SCprint  = fdPrint(8)
     
@@ -1168,16 +1210,15 @@ def main():
     #print(scheduler.queue)
     for event in scheduler.queue:
         print(dt.datetime.fromtimestamp(event.time), str(event.action).split(' ')[2])
-
     print('\n\n')
     NCheader.printHeaderLine(reschedule = False)
     SCheader.printHeaderLine(reschedule = False)
-    
+    '''
     columns = "zoneHumidity,zoneHeatTemp,zoneCoolTemp,hvacMode,"              +\
         "compHeat1,compHeat2,auxHeat1,auxHeat2,auxHeat3,compCool1,compCool2," +\
         "fan,outdoorHumidity,outdoorTemp,sky,wind,zoneCalendarEvent,"         +\
         "zoneClimate,zoneHvacMode,zoneOccupancy,dmOffset,economizer"
-    resp = API.runtimeReport(list(range(4)), '2024-08-16', '2024-08-16', 0, 9, columns = columns)
+    resp = API.runtimeReport(list(range(4)), '2024-08-18', '2024-08-18', 0, 9, columns = columns)
     pp.pprint(API.runtimeReportData)
     for thermo in range(len(API.runtimeReportData)):
         print(thermo)
@@ -1190,8 +1231,8 @@ def main():
             date_str = str(myday) + " " + str(mytime)
             datetime_obj = dt.datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
             print(datetime_obj, humidity, desiredCool,zoneClimate)
-         
-    z = pp / 0
+    '''
+        
     
     scheduler.run()
 

@@ -803,7 +803,7 @@ class Ecobee(object):
         if not auth_request:
             url = f"{ECOBEE_BASE_URL}/{ECOBEE_API_VERSION}/{endpoint}"
             if payload is not None:
-                print('payload:', payload, 'url:', url)
+                #print('payload:', payload, 'url:', url)
                 url = url + payload
             headers = {
                 "Content-Type": "application/json;charset=UTF-8",
