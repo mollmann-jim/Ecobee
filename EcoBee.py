@@ -192,7 +192,7 @@ class saveEcobeeData():
             tableR = table + 'R'
             self.c[tableR] = self.DB.cursor()            
             drop = 'DROP TABLE IF EXISTS ' + tableR + ';'
-            self.c[tableR].execute(drop)
+            #self.c[tableR].execute(drop)
             '''
             database          runtimeReport column
             ----------------  ---------------------
@@ -243,7 +243,7 @@ class saveEcobeeData():
                 ' zoneCalendarEvent TEXT,             \n' +\
                 ' zoneClimate       TEXT,             \n' +\
                 ' zoneHvacMode      TEXT,             \n' +\
-                ' zonneOccupancy    INTEGER,          \n' +\
+                ' zoneOccupancy     INTEGER,          \n' +\
                 ' dmOffset          REAL,             \n' +\
                 ' economizer        INTEGER           \n' +\
                 ');'
@@ -507,6 +507,28 @@ class saveEcobeeData():
         self.DB.commit()
 
     def RuntimeReportData(self, API, startDate, endDate):
+        '''
+        self.translate = {'datatime' : 'dataTime', 'temperature' : 'temperature',  \
+                          'humidity' : 'humidity', 'desiredheat' : 'desiredHeat',  \
+                          'desiredcool' : 'desiredCool',  'hvacmode' : 'hvacMode', \
+                          'heatpump1' : 'heatPump1', 'heatpump2' : 'heatPump2',    \
+                          'auxheat1' : 'auxHeat1', 'auxheat2' : 'auxHeat2',        \
+                          'auxheat3' : 'auxHeat3',  'cool1' : 'cool1',             \
+                          'cool2' : 'cool2', 'fan' : 'fan',                        \
+                          'outdoorhumidity' : 'outdoorHumidity',                   \
+                          'outdoortemp' : 'outdoorTemp',                           \
+                          'sky' : 'sky', 'wind' : 'wind',                          \
+                          'zonecalendarevent' : 'zoneCalendarEvent',               \
+                          'zoneclimate' : 'zoneClimate',                           \
+                          'zonehvacmode' : 'zoneHvacMode',                         \
+                          'zoneoccupancy' : 'zoneOccupancy',                       \
+                          'dmoffset' : 'dmOffset', ' economizer' : 'economizer'}
+        '''
+        columnNames = 'dataTime, temperature, humidity, desiredHeat, '               \
+            'desiredCool, hvacMode, heatPump1, heatPump2, auxHeat1, auxHeat2, '      \
+            'auxHeat3, cool1, cool2, fan, outdoorHumidity, outdoorTemp, sky, '       \
+            'wind, zoneCalendarEvent, zoneClimate, zoneHvacMode, zoneOccupancy, '    \
+            'dmOffset, economizer'
         rows0 =  API.runtimeReportData[0]['rowCount']
         print('saveEcobeeData.RuntimeReportData:', startDate, endDate, 'rows:', rows0, '\n')
         for i in range(len(API.runtimeReportData)):
@@ -519,31 +541,79 @@ class saveEcobeeData():
                     found = True
                     break
             if not found:
-                print('unable to find thermostat ', API.runtimeReportData[i]['thermostatIdentifier'])
+                print('unable to find thermostat ',
+                      API.runtimeReportData[i]['thermostatIdentifier'])
             myRunt = API.runtimeReportData[i]['rowList']
             for row in myRunt:
                 myday, mytime, temperature, humidity, desiredHeat, desiredCool, \
                 hvacMode, heatPump1, heatPump2, auxHeat1, auxHeat2, auxHeat3,   \
                 cool1, cool2, fan, outdoorHumidity, outdoorTemp, sky, wind,     \
-                zoneCalendarEvent, zoneClimate, zoneHvacMode, zonneOccupancy,   \
+                zoneCalendarEvent, zoneClimate, zoneHvacMode, zoneOccupancy,    \
                 dmOffset, economizer = row.split(",")
                 date_str = str(myday) + " " + str(mytime)
-                dataTime = dt.datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
-                values = [dataTime, temperature, humidity, desiredHeat, desiredCool,
-                          hvacMode, heatPump1, heatPump2, auxHeat1, auxHeat2, auxHeat3,
-                          cool1, cool2, fan, outdoorHumidity, outdoorTemp, sky, wind,
-                          zoneCalendarEvent, zoneClimate, zoneHvacMode, zonneOccupancy,
-                          dmOffset, economizer]
-                insert = 'INSERT OR REPLACE INTO ' + table + ' ( \n' \
-                    'dataTime, temperature, humidity, desiredHeat, desiredCool,     \n' \
-                    'hvacMode, heatPump1, heatPump2, auxHeat1, auxHeat2, auxHeat3,  \n' \
-                    'cool1, cool2, fan, outdoorHumidity, outdoorTemp, sky, wind,    \n' \
-                    'zoneCalendarEvent, zoneClimate, zoneHvacMode, zonneOccupancy,  \n' \
-                    'dmOffset, economizer )                                         \n' \
-                    'VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '     \
-                    '?, ?, ?, ?, ?, ?);'
-                self.c[table].execute(insert, values)
-                self.DB.commit()
+                dataTime = dt.datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S").isoformat(sep = ' ')
+                nRow = [dataTime, temperature, humidity, desiredHeat, desiredCool,    \
+                        hvacMode, heatPump1, heatPump2, auxHeat1, auxHeat2, auxHeat3, \
+                        cool1, cool2, fan, outdoorHumidity, outdoorTemp, sky, wind,   \
+                        zoneCalendarEvent, zoneClimate, zoneHvacMode, zoneOccupancy,  \
+                        dmOffset, economizer]
+
+                select = 'SELECT ' + columnNames + ' FROM ' + table + ' WHERE dataTime IS ? ;'
+                OldRow = {}
+                self.c[table].execute(select, (dataTime,))
+                oldRow = self.c[table].fetchone()
+                update = True
+                if oldRow is None:
+                    print('oldRow is None')
+                else:
+                    OLDRow = dict(oldRow)
+                    #print(OLDRow)
+                    oRow = []
+                    kRow = []
+                    for key in OLDRow.keys():
+                        oRow.append(OLDRow[key])
+                        kRow.append(key)
+                #print('oRow:', oRow)
+                #print('nRow:', nRow)
+                #print('kRow:', kRow)
+                for oldData, newData, key in zip(oRow, nRow, kRow):
+                    #oldData = str(oldData)
+                    if isinstance(oldData, float):
+                        try:
+                            newData = float(newData)
+                        except:
+                            print('Failed to convert:', key, newData, ' to float')
+                    elif isinstance(oldData, int):
+                        try:
+                            newData = int(newData)
+                        except:
+                            print('Failed to convert:', key, newData, ' to int')
+                    if oldData == newData:
+                        #print(dataTime, key, oldData, newData, 'match')
+                        pass
+                    else:
+                        if oldData is None:
+                            print(dataTime, key, oldData, newData, 'oldDat1 is None')
+                        elif newData is None or newData == '':
+                            update = False
+                            print(dataTime, key, oldData, newData, 'oldData is None')
+                        else:
+                            print(dataTime, key, oldData, newData, 'oldData <> newData',
+                                  type(oldData), type(newData))
+                if update:              
+                    values = [dataTime, temperature, humidity, desiredHeat, desiredCool,
+                              hvacMode, heatPump1, heatPump2, auxHeat1, auxHeat2, auxHeat3,
+                              cool1, cool2, fan, outdoorHumidity, outdoorTemp, sky, wind,
+                              zoneCalendarEvent, zoneClimate, zoneHvacMode, zoneOccupancy,
+                              dmOffset, economizer]
+                    insert = 'INSERT OR REPLACE INTO ' + table + ' (                  \n' \
+                        + columnNames + ')                                            \n' \
+                        'VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '   \
+                        '?, ?, ?, ?, ?, ?);'
+                    self.c[table].execute(insert, values)
+                    self.DB.commit()
+                
+                
                 if i == 4:
                     print(dataTime, temperature, humidity, outdoorTemp, zoneClimate, zoneHvacMode)
     
@@ -840,7 +910,7 @@ class collectThermostatData:
         self.Saver      = Saver
         self.API        = API
         self.dayOfMonth = dayOfMonth
-        self.endDate    = None
+        self.startDate  = None
         self.hour       = hour
         self.minute     = minute
         now = dt.datetime.now()
@@ -866,10 +936,13 @@ class collectThermostatData:
         print('event:', ev)
             
     def runTCollector(self, dataDays):
-        MaxReqDays = 30
-        maxReqDays = dt.timedelta(days = MaxReqDays)
-        pause =      dt.timedelta(seconds = 30)
-        oneDay =     dt.timedelta(days = 1)
+        MaxReqDays  = 2
+        maxReqDays  = dt.timedelta(days = MaxReqDays)
+        pause       = dt.timedelta(seconds = 30)
+        oneDay      = dt.timedelta(days = 1)
+        installDate = dt.date(2021, 3, 1)
+        oldestData  = dt.date(2023, 2, 1)
+        dashes      = '*********************'
         # reschedule
         if self.dayOfMonth == None:
             self.starttime += self.frequency
@@ -883,26 +956,34 @@ class collectThermostatData:
             print('backupMode.active: skipping Collector')
             return
         
-        if self.endDate is None:
-            self.endDate   = dt.date.today()
-            self.startDate = None
+        if self.startDate is None:
+            self.startDate   = dt.date.today() - dt.timedelta(days = dataDays)
+            self.endDate = None
         if dataDays <= MaxReqDays:
-            self.startDate = self.endDate - dt.timedelta(days = dataDays)
+            self.endDate = self.startDate + dt.timedelta(days = dataDays)
             print('runTCollector:endDate:X:', self.startDate, self.endDate, dataDays)
             self.Getter(self.startDate, self.endDate)
             self.Saver(self.API, self.startDate, self.endDate)
-            self.startDate = self.endDate = None
+            self.endDate = self.startDate = None
             z = dataDays / 0
         else:
-            if self.startDate is None:
-                self.startDate = self.endDate - maxReqDays
+            if self.endDate is None:
+                self.endDate = self.startDate + maxReqDays
                 print('runTCollector:endDate:Z:', self.startDate, self.endDate, dataDays)
             else:
-                self.endDate = self.startDate - oneDay
-                self.startDate = self.endDate - maxReqDays
+                self.startDate = self.endDate + oneDay
+                self.endDate = self.startDate + maxReqDays
             #print('runTCollector:endDate:Z:', self.startDate, self.endDate, dataDays)
-            self.Getter(self.startDate, self.endDate)
-            self.Saver(self.API, self.startDate, self.endDate)
+            if self.endDate < installDate or self.endDate < oldestData:
+                dashes1 = '\n\n' + dashes
+                dashes2 =  dashes + '\n\n'
+                if self.endDate < installDate:
+                    print(dashes1 + self.endDate + ' Prior to EcoBee install ' + dashes2)
+                if self.endDate < oldestData:
+                    print(dashes1 +  self.endDate + ' Prior to Oldest EcoBee Data ' + dashes2)
+            else:
+                self.Getter(self.startDate, self.endDate)
+                self.Saver(self.API, self.startDate, self.endDate)
             self.starttime += pause
             dataDays -= MaxReqDays
             self.scheduler.enterabs(time.mktime(self.starttime.timetuple()), 1,
@@ -1156,7 +1237,7 @@ def main():
     
     rRTest = collectThermostatData(scheduler)
     rRTest.runTSchedule(API.getRuntimeReportData, rRsave.RuntimeReportData,
-                        API, seconds = 30, dataDays = 400)
+                        API, seconds = 30, dataDays = 0)
     '''                    
     rRDaily = collectThermostatData(scheduler)
     rRDaily.runTSchedule(API.getRuntimeReportData, rRsave.RuntimeReportData,
