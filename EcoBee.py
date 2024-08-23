@@ -26,7 +26,6 @@ def setLogging(logger):
     fh = logging.FileHandler(LOGFILE)
     fh.setLevel(logging.ERROR)
     fh.setLevel(logging.WARNING)
-    fh.setLevel(logging.DEBUG)
     #fh.setLevel(logging.DEBUG)
     # create console handler with a higher log level
     ch = logging.StreamHandler()
@@ -51,7 +50,6 @@ def doCmd(command, printFailure = True, debug = False):
     result = subprocess.run(command, shell = True, stdout = subprocess.PIPE, \
                             stderr=subprocess.STDOUT)
     if result.returncode != 0 & printFailure:
-        #print(result.stdout)
         print('Failed: RC:', result.returncode, command)
         print(result.stderr)
     if debug: print('doCmd:result:', result)
@@ -191,7 +189,7 @@ class saveEcobeeData():
 
             tableR = table + 'R'
             self.c[tableR] = self.DB.cursor()            
-            drop = 'DROP TABLE IF EXISTS ' + tableR + ';'
+            #drop = 'DROP TABLE IF EXISTS ' + tableR + ';'
             #self.c[tableR].execute(drop)
             '''
             database          runtimeReport column
@@ -507,23 +505,6 @@ class saveEcobeeData():
         self.DB.commit()
 
     def RuntimeReportData(self, API, startDate, endDate):
-        '''
-        self.translate = {'datatime' : 'dataTime', 'temperature' : 'temperature',  \
-                          'humidity' : 'humidity', 'desiredheat' : 'desiredHeat',  \
-                          'desiredcool' : 'desiredCool',  'hvacmode' : 'hvacMode', \
-                          'heatpump1' : 'heatPump1', 'heatpump2' : 'heatPump2',    \
-                          'auxheat1' : 'auxHeat1', 'auxheat2' : 'auxHeat2',        \
-                          'auxheat3' : 'auxHeat3',  'cool1' : 'cool1',             \
-                          'cool2' : 'cool2', 'fan' : 'fan',                        \
-                          'outdoorhumidity' : 'outdoorHumidity',                   \
-                          'outdoortemp' : 'outdoorTemp',                           \
-                          'sky' : 'sky', 'wind' : 'wind',                          \
-                          'zonecalendarevent' : 'zoneCalendarEvent',               \
-                          'zoneclimate' : 'zoneClimate',                           \
-                          'zonehvacmode' : 'zoneHvacMode',                         \
-                          'zoneoccupancy' : 'zoneOccupancy',                       \
-                          'dmoffset' : 'dmOffset', ' economizer' : 'economizer'}
-        '''
         columnNames = 'dataTime, temperature, humidity, desiredHeat, '               \
             'desiredCool, hvacMode, heatPump1, heatPump2, auxHeat1, auxHeat2, '      \
             'auxHeat3, cool1, cool2, fan, outdoorHumidity, outdoorTemp, sky, '       \
@@ -564,42 +545,38 @@ class saveEcobeeData():
                 oldRow = self.c[table].fetchone()
                 update = True
                 if oldRow is None:
-                    print('oldRow is None')
+                    #print('oldRow is None')
+                    pass
                 else:
                     OLDRow = dict(oldRow)
-                    #print(OLDRow)
                     oRow = []
                     kRow = []
                     for key in OLDRow.keys():
                         oRow.append(OLDRow[key])
                         kRow.append(key)
-                #print('oRow:', oRow)
-                #print('nRow:', nRow)
-                #print('kRow:', kRow)
-                for oldData, newData, key in zip(oRow, nRow, kRow):
-                    #oldData = str(oldData)
-                    if isinstance(oldData, float):
-                        try:
-                            newData = float(newData)
-                        except:
-                            print('Failed to convert:', key, newData, ' to float')
-                    elif isinstance(oldData, int):
-                        try:
-                            newData = int(newData)
-                        except:
-                            print('Failed to convert:', key, newData, ' to int')
-                    if oldData == newData:
-                        #print(dataTime, key, oldData, newData, 'match')
-                        pass
-                    else:
-                        if oldData is None:
-                            print(dataTime, key, oldData, newData, 'oldDat1 is None')
-                        elif newData is None or newData == '':
-                            update = False
-                            print(dataTime, key, oldData, newData, 'oldData is None')
+                    for oldData, newData, key in zip(oRow, nRow, kRow):
+                        if isinstance(oldData, float):
+                            try:
+                                newData = float(newData)
+                            except:
+                                print('Failed to convert:', key, newData, ' to float')
+                        elif isinstance(oldData, int):
+                            try:
+                                newData = int(newData)
+                            except:
+                                print('Failed to convert:', key, newData, ' to int')
+                        if oldData == newData:
+                            pass
                         else:
-                            print(dataTime, key, oldData, newData, 'oldData <> newData',
-                                  type(oldData), type(newData))
+                            if oldData is None or oldData == '':
+                                #print(dataTime, key, oldData, newData, 'oldData is None')
+                                pass
+                            elif newData is None or newData == '':
+                                update = False
+                                print(dataTime, key, oldData, newData, 'oldData is None')
+                            else:
+                                print(dataTime, key, '"' + oldData + '"', '"' + newData +'"',
+                                      'oldData <> newData', type(oldData), type(newData))
                 if update:              
                     values = [dataTime, temperature, humidity, desiredHeat, desiredCool,
                               hvacMode, heatPump1, heatPump2, auxHeat1, auxHeat2, auxHeat3,
@@ -706,10 +683,6 @@ class ecobee(pyecobee.Ecobee):
         #print('ecobee:getRuntimeReportData:', startDate, endDate)
         endDate  = endDate.isoformat()
         startDate = startDate.isoformat()
-        columns = "zoneHumidity,zoneHeatTemp,zoneCoolTemp,hvacMode,"              +\
-            "compHeat1,compHeat2,auxHeat1,auxHeat2,auxHeat3,compCool1,compCool2," +\
-            "fan,outdoorHumidity,outdoorTemp,sky,wind,zoneCalendarEvent,"         +\
-            "zoneClimate,zoneHvacMode,zoneOccupancy,dmOffset,economizer"
         columns = "zoneAveTemp,zoneHumidity,zoneHeatTemp,zoneCoolTemp,hvacMode,"  +\
             "compHeat1,compHeat2,auxHeat1,auxHeat2,auxHeat3,compCool1,compCool2," +\
             "fan,outdoorHumidity,outdoorTemp,sky,wind,zoneCalendarEvent,"         +\
@@ -936,7 +909,7 @@ class collectThermostatData:
         print('event:', ev)
             
     def runTCollector(self, dataDays):
-        MaxReqDays  = 2
+        MaxReqDays  = 7
         maxReqDays  = dt.timedelta(days = MaxReqDays)
         pause       = dt.timedelta(seconds = 30)
         oneDay      = dt.timedelta(days = 1)
@@ -1237,7 +1210,7 @@ def main():
     
     rRTest = collectThermostatData(scheduler)
     rRTest.runTSchedule(API.getRuntimeReportData, rRsave.RuntimeReportData,
-                        API, seconds = 30, dataDays = 0)
+                        API, seconds = 30, dataDays = 7)
     '''                    
     rRDaily = collectThermostatData(scheduler)
     rRDaily.runTSchedule(API.getRuntimeReportData, rRsave.RuntimeReportData,
