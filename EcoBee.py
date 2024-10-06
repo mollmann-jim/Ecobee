@@ -19,7 +19,6 @@ from traceback import print_exc, print_stack
 from dateutil.relativedelta import relativedelta
 from zoneinfo import ZoneInfo
 
-
 def setLogging(logger):
     global LOGFILE
     logger.setLevel(logging.DEBUG)
@@ -52,6 +51,7 @@ def doCmd(command, printFailure = True, debug = False):
     result = subprocess.run(command, shell = True, stdout = subprocess.PIPE, \
                             stderr=subprocess.STDOUT)
     if result.returncode != 0 & printFailure:
+        #print(result.stdout)
         print('Failed: RC:', result.returncode, command)
         print(result.stderr)
     if debug: print('doCmd:result:', result)
@@ -766,7 +766,7 @@ class ecobee(pyecobee.Ecobee):
         if self.thermostats[index]['events'][event]['running']:
             name = '*' + name
         return name
-        
+
 class Status:
     def __init__(self, scheduler, thermostats = [], printer = None):
         self.scheduler   = scheduler
@@ -889,7 +889,6 @@ class Status:
         print(self.API)
         print(self.starttime)
         print(self.frequency)
-                
 
 class collectThermostatData:
     def __init__(self, scheduler):
@@ -1284,7 +1283,7 @@ def main():
                            API, dayOfMonth = 2, hour = 1, kwargs = {'dataDays' : 32})
     '''
     rRmonthly.runTSchedule(API.getRuntimeReportData, rRsave.RuntimeReportData,
-                           API, dayOfMonth = 5, hour = 20, minute = 11,
+                           API, dayOfMonth = 6, hour = 12, minute = 42,
                            dataDays = 600)
     '''
     rRAll = collectThermostatData(scheduler)
@@ -1360,27 +1359,7 @@ def main():
     print('\n\n')
     NCheader.printHeaderLine(reschedule = False)
     SCheader.printHeaderLine(reschedule = False)
-    '''
-    columns = "zoneHumidity,zoneHeatTemp,zoneCoolTemp,hvacMode,"              +\
-        "compHeat1,compHeat2,auxHeat1,auxHeat2,auxHeat3,compCool1,compCool2," +\
-        "fan,outdoorHumidity,outdoorTemp,sky,wind,zoneCalendarEvent,"         +\
-        "zoneClimate,zoneHvacMode,zoneOccupancy,dmOffset,economizer"
-    resp = API.runtimeReport(list(range(4)), '2024-08-18', '2024-08-18', 0, 9, columns = columns)
-    pp.pprint(API.runtimeReportData)
-    for thermo in range(len(API.runtimeReportData)):
-        print(thermo)
-        for row in range(len(API.runtimeReportData[thermo]['rowList'])):
-            myday, mytime, humidity, desiredHeat, desiredCool, hvacMode, heatPump1, \
-                heatPump2, auxHeat1, auxHeat2, auxHeat3, cool1, cool2, fan, \
-                outdoorHumidity, outdoorTemp, sky, wind, zoneCalendarEvent, zoneClimate, \
-                zoneHvacMode, zoneOccupancy, dmOffset, economizer = \
-                    API.runtimeReportData[thermo]['rowList'][row].split(",")
-            date_str = str(myday) + " " + str(mytime)
-            datetime_obj = dt.datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
-            print(datetime_obj, humidity, desiredCool,zoneClimate)
-    '''
-        
-    
+
     scheduler.run()
 
 if 'New' in sys.argv[0]:
