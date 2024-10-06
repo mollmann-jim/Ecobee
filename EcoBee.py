@@ -542,15 +542,16 @@ class saveEcobeeData():
                 myDataTime = dt.datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
                 dataTime = myDataTime.isoformat(sep = ' ')
                 dataTimeTZ = self.tz.addTZ(myDataTime)
-                nRow = [dataTimeTZ, dataTime, temperature, humidity, desiredHeat, desiredCool,    \
+                dataTimetz = dataTimeTZ.isoformat(sep = ' ')
+                nRow = [dataTimetz, dataTime, temperature, humidity, desiredHeat, desiredCool,    \
                         hvacMode, heatPump1, heatPump2, auxHeat1, auxHeat2, auxHeat3, \
                         cool1, cool2, fan, outdoorHumidity, outdoorTemp, sky, wind,   \
                         zoneCalendarEvent, zoneClimate, zoneHvacMode, zoneOccupancy,  \
                         dmOffset, economizer]
 
-                select = 'SELECT ' + columnNames + ' FROM ' + table + ' WHERE dataTimeTZ IS ? ;'
+                select = 'SELECT ' + columnNames + ' FROM ' + table + ' WHERE dataTimetz IS ? ;'
                 OldRow = {}
-                self.c[table].execute(select, (dataTimeTZ,))
+                self.c[table].execute(select, (dataTimetz,))
                 oldRow = self.c[table].fetchone()
                 update = True
                 if oldRow is None:
@@ -603,7 +604,7 @@ class saveEcobeeData():
                                                     'oldData <> newDatat',
                                                     str(oldData), str(newData)))
                 if update:              
-                    values = [dataTimeTZ, dataTime, temperature, humidity, desiredHeat,
+                    values = [dataTimetz, dataTime, temperature, humidity, desiredHeat,
                               desiredCool, hvacMode, heatPump1, heatPump2,
                               auxHeat1, auxHeat2, auxHeat3, cool1, cool2, fan,
                               outdoorHumidity, outdoorTemp, sky, wind,
@@ -962,8 +963,8 @@ class collectThermostatData:
             
     def runTCollector(self, dataDays):
         MaxReqDays  = 7
-        maxReqDays  = dt.timedelta(days = MaxReqDays)
-        pause       = dt.timedelta(seconds = 30)
+        maxReqDays  = dt.timedelta(days = MaxReqDays - 1)
+        pause       = dt.timedelta(seconds = 11)
         oneDay      = dt.timedelta(days = 1)
         installDate = dt.date(2021, 3, 1)
         oldestData  = dt.date(2023, 2, 1)
@@ -1014,6 +1015,7 @@ class collectThermostatData:
                 self.Saver(self.API, self.startDate, self.endDate)
             self.starttime = dt.datetime.now() + pause
             dataDays -= MaxReqDays
+            self.startDate += dt.timedelta(days = MaxReqDays)
             ev = self.scheduler.enterabs(time.mktime(self.starttime.timetuple()), 1,
                                          self.runTCollector, (dataDays,))
             self.debugRuntSch('runTCollector:MaxReqDays loop next:', ev)
@@ -1282,7 +1284,7 @@ def main():
                            API, dayOfMonth = 2, hour = 1, kwargs = {'dataDays' : 32})
     '''
     rRmonthly.runTSchedule(API.getRuntimeReportData, rRsave.RuntimeReportData,
-                           API, dayOfMonth = 5, hour = 15, minute = 30,
+                           API, dayOfMonth = 5, hour = 20, minute = 11,
                            dataDays = 600)
     '''
     rRAll = collectThermostatData(scheduler)
