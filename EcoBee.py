@@ -543,13 +543,14 @@ class saveEcobeeData():
                 dataTime = myDataTime.isoformat(sep = ' ')
                 dataTimeTZ = self.tz.addTZ(myDataTime)
                 dataTimetz = dataTimeTZ.isoformat(sep = ' ')
-                nRow = [dataTimetz, dataTime, temperature, humidity, desiredHeat, desiredCool,    \
-                        hvacMode, heatPump1, heatPump2, auxHeat1, auxHeat2, auxHeat3, \
-                        cool1, cool2, fan, outdoorHumidity, outdoorTemp, sky, wind,   \
-                        zoneCalendarEvent, zoneClimate, zoneHvacMode, zoneOccupancy,  \
-                        dmOffset, economizer]
+                nRow = [dataTimetz, dataTime, temperature, humidity,                   \
+                        desiredHeat, desiredCool, hvacMode, heatPump1, heatPump2,      \
+                        auxHeat1, auxHeat2, auxHeat3, cool1, cool2, fan,               \
+                        outdoorHumidity, outdoorTemp, sky, wind, zoneCalendarEvent,    \
+                        zoneClimate, zoneHvacMode, zoneOccupancy, dmOffset, economizer]
 
-                select = 'SELECT ' + columnNames + ' FROM ' + table + ' WHERE dataTimetz IS ? ;'
+                select = 'SELECT ' + columnNames + ' FROM ' + table + \
+                    ' WHERE dataTimetz IS ? ;'
                 OldRow = {}
                 self.c[table].execute(select, (dataTimetz,))
                 oldRow = self.c[table].fetchone()
@@ -575,7 +576,8 @@ class saveEcobeeData():
                             #skip msg if more than 1 yr ago or future
                             if not (now - myDataTime > longAgo or
                                     now - myDataTime < nowDelta):
-                                print(msgFmt.format(thermoName, dataTime, key, 'newData is None',
+                                print(msgFmt.format(thermoName, dataTime, key,
+                                                    'newData is None',
                                                     str(oldData), str(newData)))
                                 print(now, myDataTime, longAgo, nowDelta,
                                       now - myDataTime,  now - myDataTime > longAgo,
@@ -585,13 +587,15 @@ class saveEcobeeData():
                             try:
                                 newData = float(newData)
                             except:
-                                print(msgFmt.format(thermoName, dataTime, key, 'New not a float',
+                                print(msgFmt.format(thermoName, dataTime, key,
+                                                    'New not a float',
                                                     str(oldData), str(newData)))
                         elif isinstance(oldData, int):
                             try:
                                 newData = int(newData)
                             except:
-                                print(msgFmt.format(thermoName, dataTime, key, 'New not an int',
+                                print(msgFmt.format(thermoName, dataTime, key,
+                                                    'New not an int',
                                                     str(oldData), str(newData)))
                         if oldData == newData:
                             pass
@@ -610,17 +614,19 @@ class saveEcobeeData():
                               outdoorHumidity, outdoorTemp, sky, wind,
                               zoneCalendarEvent, zoneClimate, zoneHvacMode, zoneOccupancy,
                               dmOffset, economizer]
-                    insert = 'INSERT OR REPLACE INTO ' + table + ' (                  \n' \
-                        + columnNames + ')                                            \n' \
-                        'VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '   \
-                        '?, ?, ?, ?, ?, ?);'
+                    insert = 'INSERT OR REPLACE INTO ' + table + ' (  \n' \
+                        + columnNames + ')                            \n' \
+                        'VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '           \
+                        '       ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '           \
+                        '       ?, ?, ?, ?, ?);'
                     self.c[table].execute(insert, values)
                     self.DB.commit()
                     #print(dataTimeTZ, dataTime, temperature, humidity)
                 
                 
                 if i == 4:
-                    print(dataTime, temperature, humidity, outdoorTemp, zoneClimate, zoneHvacMode)
+                    print(dataTime, temperature, humidity, outdoorTemp,
+                          zoneClimate, zoneHvacMode)
 
     class TZ():
         def __init__(self):
@@ -729,10 +735,10 @@ class ecobee(pyecobee.Ecobee):
         #print('ecobee:getRuntimeReportData:', startDate, endDate)
         endDate  = endDate.isoformat()
         startDate = startDate.isoformat()
-        columns = "zoneAveTemp,zoneHumidity,zoneHeatTemp,zoneCoolTemp,hvacMode,"  +\
-            "compHeat1,compHeat2,auxHeat1,auxHeat2,auxHeat3,compCool1,compCool2," +\
-            "fan,outdoorHumidity,outdoorTemp,sky,wind,zoneCalendarEvent,"         +\
-            "zoneClimate,zoneHvacMode,zoneOccupancy,dmOffset,economizer"
+        columns = 'zoneAveTemp,zoneHumidity,zoneHeatTemp,zoneCoolTemp,hvacMode,'  +\
+            'compHeat1,compHeat2,auxHeat1,auxHeat2,auxHeat3,compCool1,compCool2,' +\
+            'fan,outdoorHumidity,outdoorTemp,sky,wind,zoneCalendarEvent,'         +\
+            'zoneClimate,zoneHvacMode,zoneOccupancy,dmOffset,economizer'
         thermoList = list(range(len(self.thermostats)))              
         rc = self.runtimeReport(thermoList, startDate, endDate, columns = columns)
         #print('ecobee:getRuntimeReport:', startDate, endDate, rc)
@@ -923,12 +929,12 @@ class collectThermostatData:
 
     def debugRuntSch(self, caption, ev):
         if self.DebugRuntSch:
-            print(caption, dt.datetime.fromtimestamp(ev.time), str(ev.action).split(' ')[2],
-                  ev.argument)
+            print(caption, dt.datetime.fromtimestamp(ev.time),
+                  str(ev.action).split(' ')[2], ev.argument)
 
-    def runTSchedule(self, Getter, Saver, API, dataDays = 1,
-                     dayOfMonth = None, hour = 0, minute = 0,
-                     days = 0, hours = 0, minutes = 0, seconds = 0):
+    def runTSchedule(self, Getter, Saver, API, dataDays = 1,  dayOfMonth = None,
+                     hour = 0, minute = 0, days = 0, hours = 0, minutes = 0,
+                     seconds = 0):
         self.frequency = dt.timedelta(days = days, hours = hours,
                                       minutes = minutes, seconds = seconds)
         self.Getter     = Getter
@@ -1283,7 +1289,7 @@ def main():
                            API, dayOfMonth = 2, hour = 1, kwargs = {'dataDays' : 32})
     '''
     rRmonthly.runTSchedule(API.getRuntimeReportData, rRsave.RuntimeReportData,
-                           API, dayOfMonth = 6, hour = 12, minute = 42,
+                           API, dayOfMonth = 6, hour = 13, minute = 2,
                            dataDays = 600)
     '''
     rRAll = collectThermostatData(scheduler)
