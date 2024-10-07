@@ -192,8 +192,8 @@ class saveEcobeeData():
 
             tableR = table + 'R'
             self.c[tableR] = self.DB.cursor()            
-            drop = 'DROP TABLE IF EXISTS ' + tableR + ';'
-            self.c[tableR].execute(drop)
+            #drop = 'DROP TABLE IF EXISTS ' + tableR + ';'
+            #self.c[tableR].execute(drop)
             '''
             database          runtimeReport column
             ----------------  ---------------------
