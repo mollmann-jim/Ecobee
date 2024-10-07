@@ -7,7 +7,7 @@ from dateutil.tz import tz
 import pprint
 import json
 from sys import path
-path.append('/home/jim/tools/Ecobee.runtimeReport/')
+path.append('/home/jim/tools/Ecobee/')
 import pyecobee
 import logging
 import time
@@ -1356,11 +1356,11 @@ def main():
     scheduler.run()
 
 if 'New' in sys.argv[0]:
-    DBname  = '/home/jim/tools/Ecobee.runtimeReport/Thermostats.New.sql'
-    LOGFILE = '/home/jim/tools/Ecobee.runtimeReport/ecobee.New.log'
+    DBname  = '/home/jim/tools/Ecobee/Thermostats.New.sql'
+    LOGFILE = '/home/jim/tools/Ecobee/ecobee.New.log'
 else:
-    DBname  = '/home/jim/tools/Ecobee.runtimeReport/Thermostats.sql'
-    LOGFILE = '/home/jim/tools/Ecobee.runtimeReport/ecobee.log'
+    DBname  = '/home/jim/tools/Ecobee/Thermostats.sql'
+    LOGFILE = '/home/jim/tools/Ecobee/ecobee.log'
 
 if __name__ == '__main__':
     # want unbuffered stdout for use with "tee"
