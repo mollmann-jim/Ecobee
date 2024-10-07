@@ -1269,33 +1269,20 @@ def main():
     NCweather.Schedule(API.getWeather, NCsave.WeatherData, API, minutes = 25)
     SCweather.Schedule(API.getWeather, SCsave.WeatherData, API, minutes = 25)
     
-    rRTest = collectThermostatData(scheduler)
-    rRTest.runTSchedule(API.getRuntimeReportData, rRsave.RuntimeReportData,
-                        API, hours = 1, dataDays = 0)
-    '''                    
-    rRDaily = collectThermostatData(scheduler)
+    rR2Hourly = collectThermostatData(scheduler)
+    rR2Hourly.runTSchedule(API.getRuntimeReportData, rRsave.RuntimeReportData,
+                           API, hours = 2, dataDays = 0)
+    rRDaily   = collectThermostatData(scheduler)
     rRDaily.runTSchedule(API.getRuntimeReportData, rRsave.RuntimeReportData,
-                                   API, days = 1, hour = 3, kwargs = {'dataDays' : 1})
-    rR14th = collectThermostatData(scheduler)
-    rR14th.runTSchedule(API.getRuntimeReportData, rRsave.RuntimeReportData,
-                        API, dayOfMonth = 14, hour = 2, kwargs = {'dataDays' : 18})
-    rR28th = collectThermostatData(scheduler)
-    rR28th.runTSchedule(API.getRuntimeReportData, rRsave.RuntimeReportData,
-                       API, dayOfMonth = 28, hour = 2, kwargs = {'dataDays' : 16})
-    '''
+                         API, days = 1, hour = 3, dataDays = 1)
+    rRWeekly  = collectThermostatData(scheduler)
+    rRWeekly.runTSchedule(API.getRuntimeReportData, rRsave.RuntimeReportData,
+                          API, days = 7, hour = 3, dataDays = 15)
     rRmonthly = collectThermostatData(scheduler)
-    '''
     rRmonthly.runTSchedule(API.getRuntimeReportData, rRsave.RuntimeReportData,
-                           API, dayOfMonth = 2, hour = 1, kwargs = {'dataDays' : 32})
-    '''
-    rRmonthly.runTSchedule(API.getRuntimeReportData, rRsave.RuntimeReportData,
-                           API, dayOfMonth = 6, hour = 13, minute = 2,
+                           API, dayOfMonth = 8, hour = 3, minute = 7,
                            dataDays = 600)
-    '''
-    rRAll = collectThermostatData(scheduler)
-    rRAll.runTSchedule(API.getRuntimeReportData, rRsave.RuntimeReportData,
-                       API, dayOfMonth = 23, hour = 1, kwargs = {'dataDays' : 9999})
-    '''
+
     NCprint  = fdPrint(7)
     SCprint  = fdPrint(8)
     
