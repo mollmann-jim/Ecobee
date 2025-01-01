@@ -53,6 +53,15 @@ def printHeader():
     print('             Min   Max   Avg  Cool  Cool  Cool  Heat  Heat  Heat   Run   Run   Run')
     print('            Temp  Temp  Temp   Set   Set   Set   Set   Set   Set     %     %     %')
 
+ 
+def adapt_datetime(dt):
+    #print('adapt_datetime', dt, dt.isoformat(sep=' '))
+    return dt.isoformat(sep=' ')
+
+def convert_datetime(val):
+    #print('convert_datetime', val, dt.datetime.fromisoformat(val).replace('T', ' '))
+    return dt.datetime.fromisoformat(val).replace('T', ' ')
+
 def checkSanity(runStats, date, where):
     global insaneUsage
     # do not flag old usage
@@ -79,10 +88,16 @@ def runTimes(c, table, start, end, fanTime, auxTime):
     result = c.fetchone()
     if result['first'] is None or result['last'] is None:
         return {'elapsed' : 0, 'heat' : 0, 'cool' : 0, 'fanOn': fanTime}
+    '''
     first = dt.datetime.strptime(result['first'], '%Y-%m-%d %H:%M:%S%z')
-    last  = dt.datetime.strptime(result['last'], '%Y-%m-%d %H:%M:%S%z')
+    last  = dt.datetime.strptime(result['last'],  '%Y-%m-%d %H:%M:%S%z')
+    '''
+    first = dt.datetime.fromisoformat(result['first'])
+    last  = dt.datetime.fromisoformat(result['last'])
+    ###print('runTimes: first, last', first, last)
     selectHeat = 'SELECT sum(auxHeat1) as heat FROM ' + table +\
         ' WHERE dataTime >= ? AND dataTime <= ? AND hvacMode = "heatStage1On";'
+    ###print('runTimes: start, end', start, end)
     c.execute(selectHeat, (start, end))
     result = c.fetchone()
     if result is None:
@@ -98,6 +113,7 @@ def runTimes(c, table, start, end, fanTime, auxTime):
     else:
         coolTime = result['cool']
     elapsed = (last - first).total_seconds()
+    ###print('runTimes: first, last, elapsed',first, last, elapsed)
     return {'elapsed' : elapsed, 'heat' : heatTime, 'cool' : coolTime, 'fanOn': fanTime}
 
 def getYears(c, table):
@@ -107,8 +123,13 @@ def getYears(c, table):
         'FROM ' + table + ';'
     c.execute(select_min_max_yr)
     minmax = c.fetchone()
+    #print('getYears:', minmax['min'], minmax['max'])
+    '''
     first = dt.datetime.strptime(minmax['min'], '%Y-%m-%d %H:%M:%S%z')
     last  = dt.datetime.strptime(minmax['max'], '%Y-%m-%d %H:%M:%S%z')
+    '''
+    first = dt.datetime.fromisoformat(minmax['min'])
+    last  = dt.datetime.fromisoformat(minmax['max'])
     return first, last
 
 def makeSection(c, thermostat, table, title, byDay = False, byMonth = False, year = None):
@@ -146,7 +167,9 @@ def makeSection(c, thermostat, table, title, byDay = False, byMonth = False, yea
                                       dt.time.min)
             EOD = dt.datetime.combine(dt.datetime.strptime(record['date'], '%Y-%m-%d').date(), \
                                       dt.time.max)
+            ###print('byDay: date,BOD,EOD', record['date'], BOD, EOD )
             dailyRunStats = runTimes(c, table, BOD, EOD, record['fanRun'], record['auxRun'])
+            ###print(dailyRunStats, title)
             lineRunTm = fmtRunTmLine(dailyRunStats)
             if checkSanity(dailyRunStats, record['date'], thermostat):
                 lineRunTm += ' High Usage'
@@ -166,6 +189,7 @@ def makeSection(c, thermostat, table, title, byDay = False, byMonth = False, yea
             lineRunTm = fmtRunTmLine(dailyRunStats)
         else:
             lineTemps = fmtTempsLine(name, record)
+            ###print('else: start, end', start, end)
             lineRunTm = fmtRunTmLine(runTimes(c, table, start, end,
                                               record['fanRun'], record['auxRun']))
         print(lineTemps + lineRunTm)
@@ -199,7 +223,10 @@ def makeReport(c, thermostat, table):
     
 def main():
     EcobeeDB    = '/home/jim/tools/Ecobee/Thermostats.sql'
-    db = sqlite3.connect(EcobeeDB)
+    sqlite3.register_adapter(dt.datetime, adapt_datetime)
+    sqlite3.register_converter("DATETIME", convert_datetime)
+    db = sqlite3.connect(EcobeeDB, detect_types=sqlite3.PARSE_DECLTYPES)
+    #db.set_trace_callback(print)
     db.row_factory = sqlite3.Row
     c = db.cursor()
         

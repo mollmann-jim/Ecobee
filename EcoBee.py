@@ -46,6 +46,12 @@ def findSubstr(s1, s2):
             return l[i]
     return None
 
+def adapt_datetime(dt):
+    return dt.isoformat(sep=' ').replace('T', ' ')
+
+def convert_datetime(val):
+    return dt.datetime.fromisoformat(val)
+
 def doCmd(command, printFailure = True, debug = False):
     if debug: print('doCmd:command:', command)
     result = subprocess.run(command, shell = True, stdout = subprocess.PIPE, \
@@ -129,7 +135,9 @@ class saveEcobeeData():
         self.prevStatusTime = [0, 0, 0, 0]
         self.thermostats = thermostats
         self.where = where
-        self.DB = sqlite3.connect(DBname)
+        sqlite3.register_adapter(dt.datetime, adapt_datetime)
+        sqlite3.register_converter("DATETIME", convert_datetime)
+        self.DB = sqlite3.connect(DBname, detect_types=sqlite3.PARSE_DECLTYPES)
         self.DB.row_factory = sqlite3.Row
         self.c = {}
         self.initDB()
@@ -1314,13 +1322,37 @@ def main():
         SCdehumidify.Schedule(API, SCstatus.addLine, startHour = 4,
                               startMinute = 50, duration = 60)
     
-    SCTimeOfUseSummer = TimeOfUse(scheduler, HVACmode, thermostats = SCthermostats,
-                                  printer = SCprint)
+    SCTimeOfUseSummer   = TimeOfUse(scheduler, HVACmode, thermostats = SCthermostats,
+                                    printer = SCprint)
+    '''
+    SCTimeOfUseSummer15 = TimeOfUse(scheduler, HVACmode, thermostats = SCthermostats,
+                                    printer = SCprint)
+    SCTimeOfUseSummer16 = TimeOfUse(scheduler, HVACmode, thermostats = SCthermostats,
+                                    printer = SCprint)
+    SCTimeOfUseSummer17 = TimeOfUse(scheduler, HVACmode, thermostats = SCthermostats,
+                                    printer = SCprint)
+    '''
     SCTimeOfUseSummer.setDates(startMonth = 4, startDay = 1, endMonth = 10,
                                endDay = 31)
+    '''
+    SCTimeOfUseSummer15.setDates(startMonth = 4, startDay = 1, endMonth = 10,
+                                 endDay = 31)
+    SCTimeOfUseSummer16.setDates(startMonth = 4, startDay = 1, endMonth = 10,
+                                 endDay = 31)
+    SCTimeOfUseSummer17.setDates(startMonth = 4, startDay = 1, endMonth = 10,
+                                 endDay = 31)
+    '''
     if True:
         SCTimeOfUseSummer.Schedule(API, offHour = 15, offMinute = 0,
                                    normalHour = 18, normalMinute = 0)
+        '''
+        SCTimeOfUseSummer15.Schedule(API, offHour = 15, offMinute = 0,
+                                     normalHour = 15, normalMinute = 50)
+        SCTimeOfUseSummer16.Schedule(API, offHour = 16, offMinute = 0,
+                                     normalHour = 16, normalMinute = 50)
+        SCTimeOfUseSummer17.Schedule(API, offHour = 17, offMinute = 10,
+                                     normalHour = 18, normalMinute = 0)
+        '''
     else:
         S = E = dt.datetime.now()
         S = S + dt.timedelta(minutes = 5)
