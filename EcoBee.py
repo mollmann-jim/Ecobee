@@ -1207,13 +1207,13 @@ class TimeOfUse:
             return False
 
     def setModeOff(self):
+        self.offTime += dt.timedelta(days = 1)
+        self.scheduler.enterabs(time.mktime(self.offTime.timetuple()), 1,
+                                self.setModeOff, (self.location,))
         if not self.checkActiveSeason():
             return
         if not self.checkActiveOffTime():
             return
-        self.offTime += dt.timedelta(days = 1)
-        self.scheduler.enterabs(time.mktime(self.offTime.timetuple()), 1,
-                                self.setModeOff, (self.location,))
         for i in range(len(self.API.thermostats)):
             if self.API.thermostats[i]['name'] in self.thermostats:
                 self.setMode(self.modeOff, i)
@@ -1221,11 +1221,11 @@ class TimeOfUse:
 
     def setModeNormal(self):
         print('setModeNormal')
-        if not self.checkActiveSeason():
-            return
         self.normalTime += dt.timedelta(days = 1)
         self.scheduler.enterabs(time.mktime(self.normalTime.timetuple()), 1,
                                 self.setModeNormal, (self.location,))
+        if not self.checkActiveSeason():
+            return
         modes = self.normalModes.get()
         for i in range(len(self.API.thermostats)):
             if self.API.thermostats[i]['name'] in self.thermostats:
@@ -1331,6 +1331,7 @@ def main():
     SCdehumidify = deHumidify(scheduler, thermostats = SCthermostats, where = 'SC')
 
     host = os.getenv('HOSTNAME')
+    print('host:', host, host == 'jim4')
     if host == 'jim4':
         NCdehumidify.Schedule(API, NCstatus.addLine, startHour = 6,
                               startMinute = 30, duration = 60)
