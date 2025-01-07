@@ -782,8 +782,9 @@ class ecobee(pyecobee.Ecobee):
         return name
 
 class Status:
-    def __init__(self, scheduler, thermostats = [], printer = None):
+    def __init__(self, scheduler, location, thermostats = [], printer = None):
         self.scheduler   = scheduler
+        self.location    = location
         self.starttime   = 0
         self.thermostats = thermostats
         self.myPrint     = printer
@@ -800,12 +801,14 @@ class Status:
             firstTime += self.frequency
         self.starttime = firstTime
         #print('Schedule Start time:', self.starttime)
-        self.scheduler.enterabs(time.mktime(self.starttime.timetuple()), 1, self.Printer, ())
+        self.scheduler.enterabs(time.mktime(self.starttime.timetuple()), 1,
+                                self.Printer, (self.location,))
 
-    def printHeaderLine(self, reschedule = True):
+    def printHeaderLine(self, location, reschedule = True):
         self.starttime = self.starttime + self.frequency
         if reschedule:
-            self.scheduler.enterabs(time.mktime(self.starttime.timetuple()), 1, self.Printer, ())
+            self.scheduler.enterabs(time.mktime(self.starttime.timetuple()), 1,
+                                    self.Printer, (location,))
         hdr = '{:^10s} {:^8s}' \
             ' {:6s} {:4s} {:4s} {:4s} {:4s} {:3s} {:9s} {:9s} ' \
             ' {:6s} {:4s} {:4s} {:4s} {:4s} {:3s} {:9s} {:9s}'
@@ -816,7 +819,7 @@ class Status:
         self.myPrint.Print(line + '\n')
 
     def addLine(self, note):
-        self.printStatusLine(note = note, reschedule = False)
+        self.printStatusLine(self.where, note = note, reschedule = False)
 
     def equipmentStatus(self, i):
         eStat = self.API.thermostats[i]['equipmentStatus']
@@ -831,11 +834,12 @@ class Status:
             stat.replace('A', 'H')
         return stat
         
-    def printStatusLine(self, note = '', reschedule = True):
+    def printStatusLine(self, location, note = '', reschedule = True):
         #self.dump()
         self.starttime = self.starttime + self.frequency
         if reschedule:
-            self.scheduler.enterabs(time.mktime(self.starttime.timetuple()), 1, self.Printer, ())
+            self.scheduler.enterabs(time.mktime(self.starttime.timetuple()), 1,
+                                    self.Printer, (location,))
         if self.API.thermostats is None:
             # wait for initialization
             return
@@ -905,8 +909,9 @@ class Status:
         print(self.frequency)
 
 class collectThermostatData:
-    def __init__(self, scheduler):
+    def __init__(self, scheduler, location):
         self.scheduler = scheduler
+        self.location  = location
         self.starttime = 0
         self.backupMode = backupMode()
         self.DebugRuntSch = True
@@ -923,12 +928,14 @@ class collectThermostatData:
             firstTime += self.frequency
         self.starttime = firstTime
         #print('Schedule Start time:', self.starttime)
-        self.scheduler.enterabs(time.mktime(self.starttime.timetuple()), 1, self.Collector, ())
+        self.scheduler.enterabs(time.mktime(self.starttime.timetuple()), 1,
+                                self.Collector, (self.location,))
 
-    def Collector(self):
+    def Collector(self, location):
         # reschedule
         self.starttime = self.starttime + self.frequency
-        self.scheduler.enterabs(time.mktime(self.starttime.timetuple()), 1, self.Collector, ())
+        self.scheduler.enterabs(time.mktime(self.starttime.timetuple()), 1,
+                                self.Collector, (location,))
         if self.backupMode.active():
             print('backupMode.active: skipping Collector')
             return
@@ -971,10 +978,10 @@ class collectThermostatData:
         self.starttime = firstTime
         print('Schedule Start time:', self.starttime, dataDays)
         ev = self.scheduler.enterabs(time.mktime(self.starttime.timetuple()), 1,
-                                    self.runTCollector, (dataDays,))
+                                    self.runTCollector, (dataDays, self.location))
         self.debugRuntSch('runTSchedule:first event:', ev)
             
-    def runTCollector(self, dataDays):
+    def runTCollector(self, dataDays, location):
         MaxReqDays  = 7
         maxReqDays  = dt.timedelta(days = MaxReqDays - 1)
         pause       = dt.timedelta(seconds = 11)
@@ -989,7 +996,7 @@ class collectThermostatData:
             self.starttime += relativedelta(months = 1)
 
         ev = self.scheduler.enterabs(time.mktime(self.starttime.timetuple()), 1,
-                                     self.runTCollector, argument = (dataDays,))
+                                     self.runTCollector, argument = (dataDays, location))
         self.debugRuntSch('runTCollector: next event:', ev)
 
         if self.backupMode.active():
@@ -1030,7 +1037,7 @@ class collectThermostatData:
             dataDays -= MaxReqDays
             self.startDate += dt.timedelta(days = MaxReqDays)
             ev = self.scheduler.enterabs(time.mktime(self.starttime.timetuple()), 1,
-                                         self.runTCollector, (dataDays,))
+                                         self.runTCollector, (dataDays, location))
             self.debugRuntSch('runTCollector:MaxReqDays loop next:', ev)
         
 class deHumidify:
@@ -1059,19 +1066,22 @@ class deHumidify:
         #self.starttime = firstTime
         #print('deHumidify.Schedule Start time:', self.starttime)
         #####
-        self.scheduler.enterabs(time.mktime(self.starttime.timetuple()), 1, self.forceRun, ())
+        self.scheduler.enterabs(time.mktime(self.starttime.timetuple()), 1,
+                                self.forceRun, (self.where,))
 
-    def forceRun(self):
+    def forceRun(self, where):
         #print(dt.datetime.now(), 'deHumidify.forceRun')
         # allow getThermostatData to run first
         if self.API.thermostats is  None:
             retry = dt.datetime.now() + dt.timedelta(minutes = 1)
             #print('deHumidify.forceRun try again at ', retry)
-            self.scheduler.enterabs(time.mktime(retry.timetuple()), 1, self.forceRun, ())
+            self.scheduler.enterabs(time.mktime(retry.timetuple()), 1,
+                                    self.forceRun, (where,))
             return
         #print('deHumidify.forceRun has data')
         self.starttime += dt.timedelta(days = 1)
-        self.scheduler.enterabs(time.mktime(self.starttime.timetuple()), 1, self.forceRun, ())
+        self.scheduler.enterabs(time.mktime(self.starttime.timetuple()), 1,
+                                self.forceRun, (where,))
         #print('deHumidify.forceRun next:', self.starttime)
 
         if self.backupMode.active():
@@ -1132,8 +1142,9 @@ class deHumidify:
             self.pp.pprint(self.API.thermostats[i]['events'])
 
 class TimeOfUse:
-    def __init__(self, scheduler, HVACnode, thermostats = [], printer = None):
+    def __init__(self, scheduler, location, HVACnode, thermostats = [], printer = None):
         self.scheduler   = scheduler
+        self.location    = location
         self.thermostats = thermostats
         self.myPrint     = printer
         self.normalModes = HVACnode
@@ -1153,7 +1164,8 @@ class TimeOfUse:
                                 second = 0, microsecond = 0) - dt.timedelta(days = 1)
         while firstTime < now:
             firstTime += dt.timedelta(days = 1)
-        self.scheduler.enterabs(time.mktime(firstTime.timetuple()), 1, modeSet, ())
+        self.scheduler.enterabs(time.mktime(firstTime.timetuple()), 1, modeSet,
+                                (self.location,))
         if mode == 'normal':
             print('setFirst:Normal', self.modeNormal, firstTime)
             self.normalTime = firstTime
@@ -1201,7 +1213,7 @@ class TimeOfUse:
             return
         self.offTime += dt.timedelta(days = 1)
         self.scheduler.enterabs(time.mktime(self.offTime.timetuple()), 1,
-                                self.setModeOff, ())
+                                self.setModeOff, (self.location,))
         for i in range(len(self.API.thermostats)):
             if self.API.thermostats[i]['name'] in self.thermostats:
                 self.setMode(self.modeOff, i)
@@ -1213,7 +1225,7 @@ class TimeOfUse:
             return
         self.normalTime += dt.timedelta(days = 1)
         self.scheduler.enterabs(time.mktime(self.normalTime.timetuple()), 1,
-                                self.setModeNormal, ())
+                                self.setModeNormal, (self.location,))
         modes = self.normalModes.get()
         for i in range(len(self.API.thermostats)):
             if self.API.thermostats[i]['name'] in self.thermostats:
@@ -1239,7 +1251,17 @@ class TimeOfUse:
     def setMode(self, mode, i):
         print('setMode', mode, i, self.API.thermostats[i]['name'], dt.datetime.now())
         self.API.set_hvac_mode(i, mode)
-        
+
+def dumpSchedule(scheduler):
+    nextRun = dt.datetime.now() +  dt.timedelta(days = 1, minutes = 1)
+    nextRun = nextRun.replace(hour = 0, minute = 0, second = 0, microsecond = 0)
+    scheduler.enterabs(time.mktime(nextRun.timetuple()), 1, dumpSchedule, (scheduler,))
+    print(len(scheduler.queue), 'Schedule Entries:')
+    for event in scheduler.queue:
+        print('  ', dt.datetime.fromtimestamp(event.time),
+              str(event.action).split(' ')[2], event.argument)
+    print(' ')
+    
 def main():
     pp = pprint.PrettyPrinter(indent=4, sort_dicts=False)
     #config = {'API_KEY' : 'ObsoleteAPIkey', 'INCLUDE_NOTIFICATIONS' : 'True'}
@@ -1262,31 +1284,31 @@ def main():
     # Build a scheduler object that will look at absolute times
     scheduler = sched.scheduler(time.time, time.sleep)
 
-    NCruntime = collectThermostatData(scheduler)
-    SCruntime = collectThermostatData(scheduler)
+    NCruntime = collectThermostatData(scheduler, 'NC')
+    SCruntime = collectThermostatData(scheduler, 'SC')
     NCruntime.Schedule(API.getThermostatData, NCsave.ThermostatData, API, minutes = 2, seconds = 45)
     SCruntime.Schedule(API.getThermostatData, SCsave.ThermostatData, API, minutes = 2, seconds = 45)
     
-    NCextRuntime = collectThermostatData(scheduler)
-    SCextRuntime = collectThermostatData(scheduler)
+    NCextRuntime = collectThermostatData(scheduler, 'NC.ext')
+    SCextRuntime = collectThermostatData(scheduler, 'SC.ext')
     NCextRuntime.Schedule(API.getExtThermostatData, NCsave.ExtRuntimeData, API, minutes = 12)
     SCextRuntime.Schedule(API.getExtThermostatData, SCsave.ExtRuntimeData, API, minutes = 12)
     
-    NCweather = collectThermostatData(scheduler)
-    SCweather = collectThermostatData(scheduler)
+    NCweather = collectThermostatData(scheduler, 'NC.weather')
+    SCweather = collectThermostatData(scheduler, 'SC.weather')
     NCweather.Schedule(API.getWeather, NCsave.WeatherData, API, minutes = 25)
     SCweather.Schedule(API.getWeather, SCsave.WeatherData, API, minutes = 25)
     
-    rR2Hourly = collectThermostatData(scheduler)
+    rR2Hourly = collectThermostatData(scheduler, 'runtime.2hr')
     rR2Hourly.runTSchedule(API.getRuntimeReportData, rRsave.RuntimeReportData,
                            API, hours = 2, dataDays = 0)
-    rRDaily   = collectThermostatData(scheduler)
+    rRDaily   = collectThermostatData(scheduler, 'runtime.1day')
     rRDaily.runTSchedule(API.getRuntimeReportData, rRsave.RuntimeReportData,
                          API, days = 1, hour = 3, dataDays = 1)
-    rRWeekly  = collectThermostatData(scheduler)
+    rRWeekly  = collectThermostatData(scheduler, 'runtime.15days')
     rRWeekly.runTSchedule(API.getRuntimeReportData, rRsave.RuntimeReportData,
                           API, days = 7, hour = 3, dataDays = 15)
-    rRmonthly = collectThermostatData(scheduler)
+    rRmonthly = collectThermostatData(scheduler, 'runtime.monthly.all')
     rRmonthly.runTSchedule(API.getRuntimeReportData, rRsave.RuntimeReportData,
                            API, dayOfMonth = 8, hour = 3, minute = 7,
                            dataDays = 600)
@@ -1294,14 +1316,14 @@ def main():
     NCprint  = fdPrint(7)
     SCprint  = fdPrint(8)
     
-    NCheader = Status(scheduler, thermostats = NCthermostats, printer = NCprint)
-    SCheader = Status(scheduler, thermostats = SCthermostats, printer = SCprint)
+    NCheader = Status(scheduler, 'NC', thermostats = NCthermostats, printer = NCprint)
+    SCheader = Status(scheduler, 'SC', thermostats = SCthermostats, printer = SCprint)
 
     NCheader.Schedule(API, NCheader.printHeaderLine, minutes = 40)
     SCheader.Schedule(API, SCheader.printHeaderLine, minutes = 40)
 
-    NCstatus = Status(scheduler, thermostats = NCthermostats, printer = NCprint)
-    SCstatus = Status(scheduler, thermostats = SCthermostats, printer = SCprint)
+    NCstatus = Status(scheduler, 'NC', thermostats = NCthermostats, printer = NCprint)
+    SCstatus = Status(scheduler, 'SC', thermostats = SCthermostats, printer = SCprint)
     NCstatus.Schedule(API, NCstatus.printStatusLine, minutes = 3)
     SCstatus.Schedule(API, SCstatus.printStatusLine, minutes = 3)
 
@@ -1322,7 +1344,7 @@ def main():
         SCdehumidify.Schedule(API, SCstatus.addLine, startHour = 4,
                               startMinute = 50, duration = 60)
     
-    SCTimeOfUseSummer   = TimeOfUse(scheduler, HVACmode, thermostats = SCthermostats,
+    SCTimeOfUseSummer   = TimeOfUse(scheduler, 'SC', HVACmode, thermostats = SCthermostats,
                                     printer = SCprint)
     '''
     SCTimeOfUseSummer15 = TimeOfUse(scheduler, HVACmode, thermostats = SCthermostats,
@@ -1360,7 +1382,7 @@ def main():
         SCTimeOfUseSummer.Schedule(API, offHour = S.hour , offMinute = S.minute ,
                                    normalHour = E.hour , normalMinute = E.minute)
 
-    SCTimeOfUseWinter = TimeOfUse(scheduler, HVACmode, thermostats = SCthermostats,
+    SCTimeOfUseWinter = TimeOfUse(scheduler,'SC',  HVACmode, thermostats = SCthermostats,
                                   printer = SCprint)
     SCTimeOfUseWinter.setDates(startMonth = 11, startDay = 1, endMonth = 3, endDay = 31)
     SCTimeOfUseWinter.Schedule(API, offHour = 6, offMinute = 0, normalHour = 9,
@@ -1375,15 +1397,10 @@ def main():
                           startMinute = DH.minute, duration = 30)
     '''
     ###############
-    
-    print(len(scheduler.queue))
-    #print(scheduler.queue)
-    for event in scheduler.queue:
-        print(dt.datetime.fromtimestamp(event.time), str(event.action).split(' ')[2],
-              event.argument)
-    print('\n\n')
-    NCheader.printHeaderLine(reschedule = False)
-    SCheader.printHeaderLine(reschedule = False)
+    dumpSchedule(scheduler)
+
+    NCheader.printHeaderLine('NC', reschedule = False)
+    SCheader.printHeaderLine('SC', reschedule = False)
 
     scheduler.run()
 
