@@ -18,6 +18,7 @@ import subprocess
 from traceback import print_exc, print_stack
 from dateutil.relativedelta import relativedelta
 from zoneinfo import ZoneInfo
+import socket
 
 def setLogging(logger):
     global LOGFILE
@@ -75,7 +76,7 @@ class backupMode:
 
     def active(self):
         global backupModelastCheck, backupModeActive
-        host = doCmd('/usr/bin/hostname').stdout.decode('utf-8').rstrip('\n')
+        host = socket.gethostname()
         if host == 'jim4':
             backupModeActive = False
         else:   
@@ -1330,8 +1331,7 @@ def main():
     NCdehumidify = deHumidify(scheduler, thermostats = NCthermostats, where = 'NC')
     SCdehumidify = deHumidify(scheduler, thermostats = SCthermostats, where = 'SC')
 
-    host = os.getenv('HOSTNAME')
-    print('host:', host, host == 'jim4')
+    host = socket.gethostname()
     if host == 'jim4':
         NCdehumidify.Schedule(API, NCstatus.addLine, startHour = 6,
                               startMinute = 30, duration = 60)
