@@ -820,7 +820,7 @@ class Status:
         self.myPrint.Print(line + '\n')
 
     def addLine(self, note):
-        self.printStatusLine(self.where, note = note, reschedule = False)
+        self.printStatusLine(self.location, note = note, reschedule = False)
 
     def equipmentStatus(self, i):
         eStat = self.API.thermostats[i]['equipmentStatus']
@@ -1162,9 +1162,12 @@ class TimeOfUse:
     def setFirst(self, startHour, startMinute, modeSet, mode = None):
         now = dt.datetime.now()
         firstTime = now.replace(hour = startHour, minute = startMinute,
-                                second = 0, microsecond = 0) - dt.timedelta(days = 1)
-        while firstTime < now:
+                                second = 0, microsecond = 0) - dt.timedelta(days = 7)
+        today = now.replace(hour = 0, minute = 1, second = 0, microsecond = 0)
+        while firstTime < today:
             firstTime += dt.timedelta(days = 1)
+        if firstTime < now:
+            firstTime = now + dt.timedelta(seconds = 2)
         self.scheduler.enterabs(time.mktime(firstTime.timetuple()), 1, modeSet,
                                 (self.location,))
         if mode == 'normal':
@@ -1177,19 +1180,28 @@ class TimeOfUse:
             print('TimeOfUse.setFirst unknow mode', mode)
 
     def checkActiveSeason(self):
+        dbg = True
         now = dt.datetime.now()
         startTime = dt.datetime(now.year, self.startMonth, self.startDay)
-        endTime   = dt.datetime(now.year, self.endMonth,   self.endDay) - \
-            dt.timedelta(minutes = 2)
-        print('checkActiveSeason', startTime, endTime, now)
-        if endTime < startTime:
-            endTime += relativedelta(years = 1)
-            print('checkActiveSeason', startTime, endTime, now)
+        endTime   = dt.datetime(now.year, self.endMonth,   self.endDay) + \
+            dt.timedelta(hours = 23, minutes = 58)   # "midnught"
+        fmt = '{:s} {:s} {:s}   {:s}   {:s}'
+        fn  = 'checkActiveSeason:'
+        if dbg: print(fmt.format(' ', fn, str(startTime), str(endTime), str(now)))
+        # Winter wraps the end of the year
+        if now < endTime:            # early in the year
+            if endTime < startTime:     # should be last year
+                startTime -= relativedelta(years = 1)
+                if dbg: print(fmt.format('1', fn, str(startTime), str(endTime), str(now)))
+        else:                        # late in the year
+            if endTime < startTime:     # should be next year
+                endTime += relativedelta(years = 1)
+                if dbg: print(fmt.format('2', fn, str(startTime), str(endTime), str(now)))
         if startTime <= now <= endTime:
-            print('Active')
+            if dbg: print(fn, 'Active')
             return True
         else:
-            print('InActive')
+            if dbg: print(fn, 'InActive')
             return False
 
     def checkActiveOffTime(self):
@@ -1247,7 +1259,7 @@ class TimeOfUse:
         self.setFirst(offHour,    offMinute,    self.setModeOff,    mode = 'off')
         self.setFirst(normalHour, normalMinute, self.setModeNormal, mode = 'normal')
         #self.getNormalMode()
-        self.setModeOff()     # set "off" - check first
+        self.setModeOff(self.location)     # set "off" - check first
 
     def setMode(self, mode, i):
         print('setMode', mode, i, self.API.thermostats[i]['name'], dt.datetime.now())
