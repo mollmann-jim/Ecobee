@@ -832,7 +832,7 @@ class Status:
                 stat += short
         # NC gas heat shoiws as aux
         if 'A' in stat and 'H' not in stat:
-            stat.replace('A', 'H')
+            stat = stat.replace('A', 'H')
         return stat
         
     def printStatusLine(self, location, note = '', reschedule = True):
@@ -881,6 +881,7 @@ class Status:
         #print('sss myTherms:', myTherms)
         (A, B) = myTherms
         #self.pp.pprint(Name)
+        #print(self.API.thermostats[A]['settings']['hvacMode'], self.API.thermostats[A]['settings']['hvacMode'])
         line = fmt.format(str(now),
                           self.API.thermostats[A]['name'].replace('stairs', '').replace('Room', ''),
                           self.API.thermostats[A]['runtime']['actualTemperature'] / 10.0,
