@@ -1207,10 +1207,10 @@ class TimeOfUse:
             print('checkActiveOffTime: False')
             return False
 
-    def setModeOff(self):
+    def setModeOff(self, location):
         self.offTime += dt.timedelta(days = 1)
         self.scheduler.enterabs(time.mktime(self.offTime.timetuple()), 1,
-                                self.setModeOff, (self.location,))
+                                self.setModeOff, (location,))
         if not self.checkActiveSeason():
             return
         if not self.checkActiveOffTime():
@@ -1220,11 +1220,11 @@ class TimeOfUse:
                 self.setMode(self.modeOff, i)
                 print('setModeOff:', self.API.thermostats[i]['name'])
 
-    def setModeNormal(self):
+    def setModeNormal(self, location):
         print('setModeNormal')
         self.normalTime += dt.timedelta(days = 1)
         self.scheduler.enterabs(time.mktime(self.normalTime.timetuple()), 1,
-                                self.setModeNormal, (self.location,))
+                                self.setModeNormal, (location,))
         if not self.checkActiveSeason():
             return
         modes = self.normalModes.get()
