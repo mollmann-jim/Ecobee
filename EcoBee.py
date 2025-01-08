@@ -811,12 +811,12 @@ class Status:
             self.scheduler.enterabs(time.mktime(self.starttime.timetuple()), 1,
                                     self.Printer, (location,))
         hdr = '{:^10s} {:^8s}' \
-            ' {:6s} {:4s} {:4s} {:4s} {:4s} {:3s} {:9s} {:9s} ' \
-            ' {:6s} {:4s} {:4s} {:4s} {:4s} {:3s} {:9s} {:9s}'
+            ' {:6s} {:4s} {:4s} {:4s} {:4s} {:1s} {:3s} {:9s} {:9s} ' \
+            ' {:6s} {:4s} {:4s} {:4s} {:4s} {:1s} {:3s} {:9s} {:9s}'
 
         line = hdr.format('Date', 'Time',
-                          'Thermo', 'Temp', 'Hum.', 'Heat', 'Cool', 'Act', 'Event0', 'Event1',
-                          'Thermo', 'Temp', 'Hum.', 'Heat', 'Cool', 'Act', 'Event0', 'Event1')
+                          'Thermo', 'Temp', 'Hum.', 'Heat', 'Cool', 'M', 'Act', 'Event0', 'Event1',
+                          'Thermo', 'Temp', 'Hum.', 'Heat', 'Cool', 'M', 'Act', 'Event0', 'Event1')
         self.myPrint.Print(line + '\n')
 
     def addLine(self, note):
@@ -844,7 +844,7 @@ class Status:
         if self.API.thermostats is None:
             # wait for initialization
             return
-        fmt = '{:^6s} {:4.1f} {:^4d} {:4.1f} {:4.1f} {:^3s} {:^9s} {:^9s}  '
+        fmt = '{:^6s} {:4.1f} {:^4d} {:4.1f} {:4.1f} {:1s} {:^3s} {:^9s} {:^9s}  '
         fmt = '{:17s} ' + fmt + fmt + ' {:s}'
         now = dt.datetime.now().replace(microsecond = 0)
         Name = [[]]
@@ -854,18 +854,17 @@ class Status:
             for j in range(2):
                 Name[i].append('   ')
         # There may be 3 or more events. E.g. vacation, climate hold, template
-        myTherms = []
+        myTherms    = []
         myEquipStat = []
+        myMode      = []
+        modes       = ['auto', 'cool', 'heat', 'off']
+        modeLetter  = ['A', 'C', 'H', 'O']
         #self.pp.pprint(Name)
         for i in range(len(self.API.thermostats)):
             if self.API.thermostats[i]['name'] not in self.thermostats:
                 #print('SSS Skipping:',  self.API.thermostats[i]['name'])
                 continue
             myTherms.append(i)
-            '''
-            if i > 1:
-                Name.append([])
-            '''
             for j in range(len(self.API.thermostats[i]['events'])):
                 #print('MMM', i, j, self.API.getCurrentMode(i, j))
                 try:
@@ -878,6 +877,12 @@ class Status:
                     pp = pprint.PrettyPrinter(indent=4, sort_dicts=False)
                     pp.pprint(self.API.thermostats)
             myEquipStat.append(self.equipmentStatus((i)))
+            try:
+                m = modes.index(self.API.thermostats[i]['settings']['hvacMode'])
+                mode = modeLetter[m]
+            except ValueError:
+                mode = '?'
+            myMode.append(mode)
         #print('sss myTherms:', myTherms)
         (A, B) = myTherms
         #self.pp.pprint(Name)
@@ -888,6 +893,7 @@ class Status:
                           self.API.thermostats[A]['runtime']['actualHumidity'],
                           self.API.thermostats[A]['runtime']['desiredHeat'] / 10.0,
                           self.API.thermostats[A]['runtime']['desiredCool'] / 10.0,
+                          myMode[0],
                           myEquipStat[0],
                           Name[A][0],
                           Name[A][1],
@@ -896,6 +902,7 @@ class Status:
                           self.API.thermostats[B]['runtime']['actualHumidity'],
                           self.API.thermostats[B]['runtime']['desiredHeat'] / 10.0,
                           self.API.thermostats[B]['runtime']['desiredCool'] / 10.0,
+                          myMode[1],
                           myEquipStat[1],
                           Name[B][0],
                           Name[B][1],
