@@ -1166,16 +1166,13 @@ class TimeOfUse:
         self.endMonth   = endMonth
         self.endDay     = endDay
         print('TimeOfUse.setDates', startMonth, startDay, endMonth, endDay)
-        
+
     def setFirst(self, startHour, startMinute, modeSet, mode = None):
         now = dt.datetime.now()
         firstTime = now.replace(hour = startHour, minute = startMinute,
                                 second = 0, microsecond = 0) - dt.timedelta(days = 7)
-        today = now.replace(hour = 0, minute = 1, second = 0, microsecond = 0)
-        while firstTime < today:
+        while firstTime < now:
             firstTime += dt.timedelta(days = 1)
-        if firstTime < now:
-            firstTime = now + dt.timedelta(seconds = 2)
         self.scheduler.enterabs(time.mktime(firstTime.timetuple()), 1, modeSet,
                                 (self.location,))
         if mode == 'normal':
@@ -1227,10 +1224,11 @@ class TimeOfUse:
             print('checkActiveOffTime: False')
             return False
 
-    def setModeOff(self, location):
+    def setModeOff(self, location, reschedule = True):
         self.offTime += dt.timedelta(days = 1)
-        self.scheduler.enterabs(time.mktime(self.offTime.timetuple()), 1,
-                                self.setModeOff, (location,))
+        if reschedule:
+            self.scheduler.enterabs(time.mktime(self.offTime.timetuple()), 1,
+                                    self.setModeOff, (location,))
         if not self.checkActiveSeason():
             return
         if not self.checkActiveOffTime():
@@ -1267,7 +1265,7 @@ class TimeOfUse:
         self.setFirst(offHour,    offMinute,    self.setModeOff,    mode = 'off')
         self.setFirst(normalHour, normalMinute, self.setModeNormal, mode = 'normal')
         #self.getNormalMode()
-        self.setModeOff(self.location)     # set "off" - check first
+        self.setModeOff(self.location, reschedule = False)     # set "off" - check first
 
     def setMode(self, mode, i):
         print('setMode', mode, i, self.API.thermostats[i]['name'], dt.datetime.now())
