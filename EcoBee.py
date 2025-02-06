@@ -1270,12 +1270,12 @@ class TimeOfUse:
         self.setModeOff(self.location, reschedule = False)     # set "off" - check first
 
     def setMode(self, mode, i):
-        if i == 0:
-            dumpSchedule(self.scheduler)
+        #if i == 0:
+        #    dumpSchedule(self.scheduler)
         print('setMode', mode, i, self.API.thermostats[i]['name'], dt.datetime.now())
         self.API.set_hvac_mode(i, mode)
 
-def dumpSchedule(scheduler):
+def dumpSchedule(scheduler, id):
     now = dt.datetime.now()
     nextRun = now +  dt.timedelta(days = 1, minutes = 1)
     nextRun = nextRun.replace(hour = 0, minute = 0, second = 0, microsecond = 0)
@@ -1283,7 +1283,7 @@ def dumpSchedule(scheduler):
     nextRun = now +  dt.timedelta(hours = 6)
     nextRun = nextRun.replace(minute = 0, second = 0, microsecond = 0)
     #
-    scheduler.enterabs(time.mktime(nextRun.timetuple()), 1, dumpSchedule, (scheduler,))
+    scheduler.enterabs(time.mktime(nextRun.timetuple()), 1, dumpSchedule, (scheduler, id))
     print(len(scheduler.queue), 'Schedule Entries:  ', now)
     for event in scheduler.queue:
         print('  ', dt.datetime.fromtimestamp(event.time),
@@ -1292,6 +1292,8 @@ def dumpSchedule(scheduler):
     
 def main():
     pp = pprint.PrettyPrinter(indent=4, sort_dicts=False)
+    now = dt.datetime.now()
+    print(sys.argv[0], 'starting at', now)
     #config = {'API_KEY' : 'ObsoleteAPIkey', 'INCLUDE_NOTIFICATIONS' : 'True'}
     #API = pyecobee.Ecobee(config = config)
     API = ecobee(config_filename = 'ecobee.conf')
@@ -1425,7 +1427,7 @@ def main():
                           startMinute = DH.minute, duration = 30)
     '''
     ###############
-    dumpSchedule(scheduler)
+    dumpSchedule(scheduler, 'dumpSchedule')
 
     NCheader.printHeaderLine('NC', reschedule = False)
     SCheader.printHeaderLine('SC', reschedule = False)
