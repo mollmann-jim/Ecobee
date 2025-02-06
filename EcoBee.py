@@ -987,10 +987,10 @@ class collectThermostatData:
         self.starttime = firstTime
         print('Schedule Start time:', self.starttime, dataDays)
         ev = self.scheduler.enterabs(time.mktime(self.starttime.timetuple()), 1,
-                                    self.runTCollector, (dataDays, self.location))
+                                    self.runTCollector, (dataDays, True, self.location))
         self.debugRuntSch('runTSchedule:first event:', ev)
             
-    def runTCollector(self, dataDays, location):
+    def runTCollector(self, dataDays, notLooping, location):
         MaxReqDays  = 7
         maxReqDays  = dt.timedelta(days = MaxReqDays - 1)
         pause       = dt.timedelta(seconds = 11)
@@ -998,15 +998,17 @@ class collectThermostatData:
         installDate = dt.date(2021, 3, 1)
         oldestData  = dt.date(2023, 2, 1)
         dashes      = '*********************'
-        # reschedule
-        if self.dayOfMonth == None:
-            self.starttime += self.frequency
-        else:
-            self.starttime += relativedelta(months = 1)
+        # reschedule if not limiting collection size - "looping"
+        if notLooping:
+            if self.dayOfMonth == None:
+                self.starttime += self.frequency
+            else:
+                self.starttime += relativedelta(months = 1)
 
-        ev = self.scheduler.enterabs(time.mktime(self.starttime.timetuple()), 1,
-                                     self.runTCollector, argument = (dataDays, location))
-        self.debugRuntSch('runTCollector: next event:', ev)
+            ev = self.scheduler.enterabs(time.mktime(self.starttime.timetuple()), 1,
+                                         self.runTCollector,
+                                         argument = (dataDays, notLooping, location))
+            self.debugRuntSch('runTCollector: next event:', ev)
 
         if self.backupMode.active():
             print('backupMode.active: skipping Collector')
@@ -1017,16 +1019,18 @@ class collectThermostatData:
             self.endDate = None
         if dataDays <= MaxReqDays:
             self.endDate = self.startDate + dt.timedelta(days = dataDays)
-            print('runTCollector:endDate:X:', self.startDate, self.endDate, dataDays)
+            print('runTCollector:endDate:X:', self.startDate, self.endDate,
+                  dataDays, location)
             self.Getter(self.startDate, self.endDate)
             self.Saver(self.API, self.startDate, self.endDate)
             self.endDate = self.startDate = None
-            print('runTCollector:MaxReqDays loop done')
+            print('runTCollector:MaxReqDays loop done', location)
             #z = dataDays / 0
         else:
             if self.endDate is None:
                 self.endDate = self.startDate + maxReqDays
-                print('runTCollector:endDate:Z:', self.startDate, self.endDate, dataDays)
+                print('runTCollector:endDate:Z:', self.startDate, self.endDate,
+                      dataDays, location)
             else:
                 self.startDate = self.endDate + oneDay
                 self.endDate = self.startDate + maxReqDays
@@ -1046,7 +1050,7 @@ class collectThermostatData:
             dataDays -= MaxReqDays
             self.startDate += dt.timedelta(days = MaxReqDays)
             ev = self.scheduler.enterabs(time.mktime(self.starttime.timetuple()), 1,
-                                         self.runTCollector, (dataDays, location))
+                                         self.runTCollector, (dataDays, False, location))
             self.debugRuntSch('runTCollector:MaxReqDays loop next:', ev)
         
 class deHumidify:
