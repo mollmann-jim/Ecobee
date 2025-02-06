@@ -1225,8 +1225,10 @@ class TimeOfUse:
             return False
 
     def setModeOff(self, location, reschedule = True):
-        self.offTime += dt.timedelta(days = 1)
         if reschedule:
+            print('setModeOff:offTime:0:', self.offTime)
+            self.offTime += dt.timedelta(days = 1)
+            print('setModeOff:offTime:1:', self.offTime)
             self.scheduler.enterabs(time.mktime(self.offTime.timetuple()), 1,
                                     self.setModeOff, (location,))
         if not self.checkActiveSeason():
@@ -1268,14 +1270,21 @@ class TimeOfUse:
         self.setModeOff(self.location, reschedule = False)     # set "off" - check first
 
     def setMode(self, mode, i):
+        if i == 0:
+            dumpSchedule(self.scheduler)
         print('setMode', mode, i, self.API.thermostats[i]['name'], dt.datetime.now())
         self.API.set_hvac_mode(i, mode)
 
 def dumpSchedule(scheduler):
-    nextRun = dt.datetime.now() +  dt.timedelta(days = 1, minutes = 1)
+    now = dt.datetime.now()
+    nextRun = now +  dt.timedelta(days = 1, minutes = 1)
     nextRun = nextRun.replace(hour = 0, minute = 0, second = 0, microsecond = 0)
+    # testing
+    nextRun = now +  dt.timedelta(hours = 6)
+    nextRun = nextRun.replace(minute = 0, second = 0, microsecond = 0)
+    #
     scheduler.enterabs(time.mktime(nextRun.timetuple()), 1, dumpSchedule, (scheduler,))
-    print(len(scheduler.queue), 'Schedule Entries:')
+    print(len(scheduler.queue), 'Schedule Entries:  ', now)
     for event in scheduler.queue:
         print('  ', dt.datetime.fromtimestamp(event.time),
               str(event.action).split(' ')[2], event.argument)
@@ -1363,7 +1372,7 @@ def main():
         SCdehumidify.Schedule(API, SCstatus.addLine, startHour = 4,
                               startMinute = 50, duration = 60)
     
-    SCTimeOfUseSummer   = TimeOfUse(scheduler, 'SC', HVACmode, thermostats = SCthermostats,
+    SCTimeOfUseSummer   = TimeOfUse(scheduler, 'SCs', HVACmode, thermostats = SCthermostats,
                                     printer = SCprint)
     '''
     SCTimeOfUseSummer15 = TimeOfUse(scheduler, HVACmode, thermostats = SCthermostats,
@@ -1401,7 +1410,7 @@ def main():
         SCTimeOfUseSummer.Schedule(API, offHour = S.hour , offMinute = S.minute ,
                                    normalHour = E.hour , normalMinute = E.minute)
 
-    SCTimeOfUseWinter = TimeOfUse(scheduler,'SC',  HVACmode, thermostats = SCthermostats,
+    SCTimeOfUseWinter = TimeOfUse(scheduler,'SCw',  HVACmode, thermostats = SCthermostats,
                                   printer = SCprint)
     SCTimeOfUseWinter.setDates(startMonth = 11, startDay = 1, endMonth = 3, endDay = 31)
     SCTimeOfUseWinter.Schedule(API, offHour = 6, offMinute = 0, normalHour = 9,
