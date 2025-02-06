@@ -1334,13 +1334,13 @@ def main():
                            API, hours = 2, dataDays = 0)
     rRDaily   = collectThermostatData(scheduler, 'runtime.1day')
     rRDaily.runTSchedule(API.getRuntimeReportData, rRsave.RuntimeReportData,
-                         API, days = 1, hour = 3, dataDays = 1)
+                         API, days = 1, hour = 3, minute = 7, dataDays = 1)
     rRWeekly  = collectThermostatData(scheduler, 'runtime.15days')
     rRWeekly.runTSchedule(API.getRuntimeReportData, rRsave.RuntimeReportData,
-                          API, days = 7, hour = 3, dataDays = 15)
+                          API, days = 7, hour = 3, minute = 11, dataDays = 15)
     rRmonthly = collectThermostatData(scheduler, 'runtime.monthly.all')
     rRmonthly.runTSchedule(API.getRuntimeReportData, rRsave.RuntimeReportData,
-                           API, dayOfMonth = 8, hour = 3, minute = 7,
+                           API, dayOfMonth = 8, hour = 3, minute = 17,
                            dataDays = 600)
 
     NCprint  = fdPrint(7)
