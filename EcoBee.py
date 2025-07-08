@@ -6,12 +6,15 @@ import sqlite3
 from dateutil.tz import tz
 import pprint
 import json
+import os
+
+home = os.getenv('HOME')
+
 from sys import path
-path.append('/home/jim/tools/Ecobee/')
+path.append(home + '/tools/Ecobee/')
 import pyecobee
 import logging
 import time
-import os
 import sys
 import sched
 import subprocess
@@ -1439,11 +1442,11 @@ def main():
     scheduler.run()
 
 if 'New' in sys.argv[0]:
-    DBname  = '/home/jim/tools/Ecobee/Thermostats.New.sql'
-    LOGFILE = '/home/jim/tools/Ecobee/ecobee.New.log'
+    DBname  = home + '/tools/Ecobee/Thermostats.New.sql'
+    LOGFILE = home + '/tools/Ecobee/ecobee.New.log'
 else:
-    DBname  = '/home/jim/tools/Ecobee/Thermostats.sql'
-    LOGFILE = '/home/jim/tools/Ecobee/ecobee.log'
+    DBname  = home + '/tools/Ecobee/Thermostats.sql'
+    LOGFILE = home + '/tools/Ecobee/ecobee.log'
 
 if __name__ == '__main__':
     # want unbuffered stdout for use with "tee"
