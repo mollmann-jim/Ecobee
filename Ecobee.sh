@@ -1,11 +1,11 @@
 #!/bin/bash
 set -x
-logDir="/home/jim/tools/Ecobee/logs"
+logDir="$HOME/tools/Ecobee/logs"
 outLogStem="$logDir/Ecobee."
 outLogStemNC="$logDir/Ecobee.NC."
 outLogStemSC="$logDir/Ecobee.SC."
 logLogStem="$logDir/ecobee.log."
-timestamp=$(/bin/date +%F-%T | /bin/tr : .);
+timestamp=$(/bin/date +%F-%T | /usr/bin/tr : .);
 outLog=$outLogStem$timestamp
 outLogNC=$outLogStemNC$timestamp
 outLogSC=$outLogStemSC$timestamp
@@ -22,12 +22,12 @@ for prefix in $outLogStem $logLogStemNC $logLogStemSC; do
     fi
 done
 #/home/jim/tools/SolarEdge/collectLayout.py > $log 2>&1
-cd /home/jim/tools/Ecobee/
+cd $HOME/tools/Ecobee/
 while true; do
-    /usr/bin/date >> $outLogNC
-    /usr/bin/date >> $outLogSC
+    /bin/date >> $outLogNC
+    /bin/date >> $outLogSC
     echo '============================================================' >> $outLog
-    /home/jim/tools/Ecobee/EcoBee.py >> $outLog 2>&1 7>>$outLogNC 8>>$outLogSC
+    $HOME/tools/Ecobee/EcoBee.py >> $outLog 2>&1 7>>$outLogNC 8>>$outLogSC
     sleep 5
 done
 #
