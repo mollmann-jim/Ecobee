@@ -3,10 +3,14 @@ import datetime as dt
 import sqlite3
 from dateutil.tz import tz
 from sys import path
-path.append('/home/jim/tools/')
+import os
+
+home = os.getenv('HOME')
+
+path.append(home + '/tools/')
 from shared import getTimeInterval
 
-#DBname = '/home/jim/tools/Honeywell/MBthermostat3.sql'
+#DBname = home + '/tools/Honeywell/MBthermostat3.sql'
 saneUsageMax = 33.3
 #saneUsageMax = 10.0
 global insaneUsage
@@ -222,7 +226,7 @@ def makeReport(c, thermostat, table):
     #makeSection(c, thermostat,  'All', byDay = True)
     
 def main():
-    EcobeeDB    = '/home/jim/tools/Ecobee/Thermostats.sql'
+    EcobeeDB    = home + '/tools/Ecobee/Thermostats.sql'
     sqlite3.register_adapter(dt.datetime, adapt_datetime)
     sqlite3.register_converter("DATETIME", convert_datetime)
     db = sqlite3.connect(EcobeeDB, detect_types=sqlite3.PARSE_DECLTYPES)
