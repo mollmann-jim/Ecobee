@@ -80,7 +80,7 @@ def checkSanity(runStats, date, where):
                 fmt = '\n{:>10s} - {:>10s} {:>4s} utilization of {:>5.1f}% exceeds the {:>5.1f}%' \
                     ' limit. Runtime = {:>8s}'
                 runTime = str(dt.timedelta(seconds = runStats[which]))
-                insaneUsage += fmt.format(date, where, which, runPct, saneUsageMax, runTime)
+                insaneUsage += fmt.format(str(date), where, which, runPct, saneUsageMax, runTime)
                 return True
     return False
                                                
