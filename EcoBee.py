@@ -1014,7 +1014,7 @@ class collectThermostatData:
             self.debugRuntSch('runTCollector: next event:', ev)
 
         if self.backupMode.active():
-            print('backupMode.active: skipping Collector')
+            print(dt.datetime.now(), ': backupMode.active: skipping runTCollector')
             return
         
         if self.startDate is None:
@@ -1101,7 +1101,7 @@ class deHumidify:
         #print('deHumidify.forceRun next:', self.starttime)
 
         if self.backupMode.active():
-            print('backupMode.active: skipping forceRun')
+            print(dt.datetime.now(), ': backupMode.active: skipping forceRun')
             return
 
         for i in range(len(self.API.thermostats)):
