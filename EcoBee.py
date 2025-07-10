@@ -949,7 +949,7 @@ class collectThermostatData:
         self.scheduler.enterabs(time.mktime(self.starttime.timetuple()), 1,
                                 self.Collector, (location,))
         if self.backupMode.active():
-            print('backupMode.active: skipping Collector')
+            print(dt.datetime.now(), ': backupMode.active: skipping Collector')
             return
         self.Getter(frequency = self.frequency)
         self.Saver(self.API)
