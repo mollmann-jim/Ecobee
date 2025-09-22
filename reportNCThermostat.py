@@ -21,7 +21,7 @@ def fmtTempsLine(tag, row):
     #      row['minH'],row['maxH'],row['avgH'])
     noData = '  None'
     noData = '     .'
-    line = tag + ': (none)'
+    line = '{:>10s} (none)'.format(tag)
     if row['minT'] is not None:
         period =  '{:>10s}'.format(tag)
         minT   = ' {:>5.1f}'.format(row['minT'])     if row['minT'] is not None else noData
