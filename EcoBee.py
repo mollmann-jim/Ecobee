@@ -112,13 +112,14 @@ class normalTermostatModes:
         self.currentHVACmodes = {}
         
     def current(self, thermostat, mode):
-        #print('normalTermostatModes:current', thermostat, mode)
+        #print(dt.datetime.now(),'normalTermostatModes:current', thermostat, mode)
         self.currentHVACmodes[thermostat] = mode
 
     def update(self, Saver):
         for thermostat in self.currentHVACmodes:
             curMode = self.currentHVACmodes[thermostat]
             savMode = self.savedHVACmodes.get(thermostat, None)
+            #print('normalTermostatModes:update therm/cur/sav', thermostat, curMode, savMode)
             if curMode == 'off' or curMode == None or curMode == savMode:
                 pass
             else:
@@ -1248,7 +1249,9 @@ class TimeOfUse:
                 print('setModeOff:', self.API.thermostats[i]['name'])
 
     def setModeNormal(self, location):
-        print('setModeNormal')
+        now = dt.datetime.now()
+        print(now, 'setModeNormal')
+        resetModeTime    = self.normalTime + dt.timedelta(minutes = 5)
         self.normalTime += dt.timedelta(days = 1)
         self.scheduler.enterabs(time.mktime(self.normalTime.timetuple()), 1,
                                 self.setModeNormal, (location,))
@@ -1260,9 +1263,13 @@ class TimeOfUse:
                 mode = modes.get(self.API.thermostats[i]['name'], None)
                 if mode is not None:
                     self.setMode(mode, i)
-                    print('setModeNormal:', self.API.thermostats[i]['name'], mode)
+                    print(now, 'setModeNormal:', self.API.thermostats[i]['name'], mode)
+                    self.scheduler.enterabs(time.mktime(resetModeTime.timetuple()), 1,
+                                self.setMode, (mode, i))
+                    print(now, 'setModeNormal:resetModeTime:',
+                          self.API.thermostats[i]['name'], mode, i, resetModeTime)
                 else:
-                    print('setModeNormal', self.API.thermostats[i]['name'],
+                    print(now, 'setModeNormal', self.API.thermostats[i]['name'],
                           'not found', modes)
 
     def Schedule(self, API, offHour = 15, offMinute = 0, normalHour = 18, normalMinute = 0):
