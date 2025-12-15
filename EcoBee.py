@@ -826,7 +826,7 @@ class Status:
     def addLine(self, note):
         self.printStatusLine(self.location, note = note, reschedule = False)
 
-    def equipmentStatus(self, i):
+    def equipmentStatus(self, i, location):
         eStat = self.API.thermostats[i]['equipmentStatus']
         stat = ''
         eStats = ['compCool', 'heatPump', 'auxHeat', 'fan']
@@ -835,7 +835,7 @@ class Status:
             if long in eStat:
                 stat += short
         # NC gas heat shoiws as aux
-        if 'A' in stat and 'H' not in stat:
+        if location == 'NC':
             stat = stat.replace('A', 'H')
         return stat
         
@@ -880,7 +880,7 @@ class Status:
                     print(i, j, Name)
                     pp = pprint.PrettyPrinter(indent=4, sort_dicts=False)
                     pp.pprint(self.API.thermostats)
-            myEquipStat.append(self.equipmentStatus((i)))
+            myEquipStat.append(self.equipmentStatus(i, location))
             try:
                 m = modes.index(self.API.thermostats[i]['settings']['hvacMode'])
                 mode = modeLetter[m]
