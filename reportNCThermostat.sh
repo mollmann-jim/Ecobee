@@ -7,7 +7,7 @@ log=$logDir/report.$(/bin/date +%F-%T | /usr/bin/tr : .);
 $HOME/tools/Ecobee/reportNCThermostat.py  > $log 2>&1
 cp -p $log $reportDir/NC.Thermostat.txt
 cp -p $log $reportDir/All/NC.Thermostat.$(basename -- "$log").txt
-cat $log
+#cat $log
 # keep only the newest
 REMOVE=$(ls -t $logDir/report* | sed 1,20d)
 if [ -n "$REMOVE" ]; then
