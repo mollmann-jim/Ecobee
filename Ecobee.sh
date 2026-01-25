@@ -15,7 +15,7 @@ touch $logLog
 /bin/rm $logDir/../ecobee.log
 /bin/ln $logLog $logDir/../ecobee.log
 # keep only the newest
-for prefix in $outLogStem $logLogStemNC $logLogStemSC; do
+for prefix in $outLogStem $logLogStemNC $logLogStemSC $logLogStem; do
     REMOVE=$(ls -t $prefix* | sed 1,20d)
     if [ -n "$REMOVE" ]; then
 	/bin/rm $REMOVE
