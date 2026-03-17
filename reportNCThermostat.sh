@@ -4,7 +4,16 @@ logDir="$HOME/tools/Ecobee/logs"
 reportDir="$HOME/SynologyDrive/Reports.Daily/"
 log=$logDir/report.$(/bin/date +%F-%T | /usr/bin/tr : .);
 #$HOME/tools/Ecobee/reportNMBThermostat.py > $log 2>&1
-$HOME/tools/Ecobee/reportNCThermostat.py  > $log 2>&1
+if [[ "$HOSTNAME" != "jim4" ]]; then
+    newAge=77
+    updated=$(find $HOME/SynologyDrive/Reports.Daily/ -name SolarEdge.txt -mmin -$newAge | wc -l)
+    if [[ $updated > 0 ]]; then
+	#echo already run
+	exit 0
+    fi
+fi
+echo -e "--------- $HOSTNAME --------- $(date) ----------\n" > $log
+$HOME/tools/Ecobee/reportNCThermostat.py  >> $log 2>&1
 cp -p $log $reportDir/NC.Thermostat.txt
 cp -p $log $reportDir/All/NC.Thermostat.$(basename -- "$log").txt
 #cat $log
