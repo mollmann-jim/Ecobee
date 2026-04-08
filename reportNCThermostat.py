@@ -1,19 +1,18 @@
 #!/usr/bin/env python3
 import datetime as dt
 import sqlite3
-from dateutil.tz import tz
 from sys import path
 import os
+#from dateutil.tz import tz
 
 home = os.getenv('HOME')
-
 path.append(home + '/tools/')
 from shared import getTimeInterval
 
 #DBname = home + '/tools/Honeywell/MBthermostat3.sql'
 saneUsageMax = 33.3
 #saneUsageMax = 10.0
-global insaneUsage
+#global insaneUsage
 insaneUsage = ''
 
 def fmtTempsLine(tag, row):
@@ -21,31 +20,30 @@ def fmtTempsLine(tag, row):
     #      row['minH'],row['maxH'],row['avgH'])
     noData = '  None'
     noData = '     .'
-    line = '{:>10s} (none)'.format(tag)
+    line = f'{tag:>10s} : (none)'
     if row['minT'] is not None:
-        period =  '{:>10s}'.format(tag)
-        minT   = ' {:>5.1f}'.format(row['minT'])     if row['minT'] is not None else noData
-        maxT   = ' {:>5.1f}'.format(row['maxT'])     if row['maxT'] is not None else noData
-        avgT   = ' {:>5.1f}'.format(row['avgT'])     if row['avgT'] is not None else noData
-        minC   = ' {:>-5d}'.format(int(row['minC'])) if row['minC'] is not None else noData
-        maxC   = ' {:>5d}'.format(int(row['maxC']))  if row['maxC'] is not None else noData
-        avgC   = ' {:>5.1f}'.format(row['avgC'])     if row['avgC'] is not None else noData
-        minH   = ' {:>5d}'.format(int(row['minH']))  if row['minH'] is not None else noData
-        maxH   = ' {:>5d}'.format(int(row['maxH']))  if row['maxH'] is not None else noData
-        avgH   = ' {:>5.1f}'.format(row['avgH']) if row['avgH'] is not None else noData
+        period = f'{tag:>10s}'
+        minT   = f' {row['minT']:>5.1f}'     if row['minT'] is not None else noData
+        maxT   = f' {row['maxT']:>5.1f}'     if row['maxT'] is not None else noData
+        avgT   = f' {row['avgT']:>5.1f}'     if row['avgT'] is not None else noData
+        minC   = f' {int(row['minC']):>-5d}' if row['minC'] is not None else noData
+        maxC   = f' {int(row['maxC']):>5d}'  if row['maxC'] is not None else noData
+        avgC   = f' {row['avgC']:>5.1f}'     if row['avgC'] is not None else noData
+        minH   = f' {int(row['minH']):>5d}'  if row['minH'] is not None else noData
+        maxH   = f' {int(row['maxH']):>5d}'  if row['maxH'] is not None else noData
+        avgH   = f' {row['avgH']:>5.1f}'     if row['avgH'] is not None else noData
         line = period + minT + maxT + avgT + minC + maxC + avgC + minH + maxH + avgH
     return line
 
 def fmtRunTmLine(x):
-    
     line = ''
     noData = '     .'
     if x['elapsed'] > 0:
-        heatPct = '{:>6.1f}'.format(100.0 * x['heat']  / x['elapsed']) \
+        heatPct = f'{(100.0 * x['heat']  / x['elapsed']):>6.1f}' \
             if x['heat']  is not None else noData
-        coolPct = '{:>6.1f}'.format(100.0 * x['cool']  / x['elapsed']) \
+        coolPct = f'{(100.0 * x['cool']  / x['elapsed']):>6.1f}' \
             if x['cool']  is not None else noData
-        fanPct  = '{:>6.1f}'.format(100.0 * x['fanOn'] / x['elapsed']) \
+        fanPct  =f'{(100.0 * x['fanOn']  / x['elapsed']):>6.1f}' \
             if x['fanOn'] is not None else noData
         line = heatPct + coolPct + fanPct
     return line
@@ -57,10 +55,10 @@ def printHeader():
     print('             Min   Max   Avg  Cool  Cool  Cool  Heat  Heat  Heat   Run   Run   Run')
     print('            Temp  Temp  Temp   Set   Set   Set   Set   Set   Set     %     %     %')
 
- 
-def adapt_datetime(dt):
+
+def adapt_datetime(DT):
     #print('adapt_datetime', dt, dt.isoformat(sep=' '))
-    return dt.isoformat(sep=' ')
+    return DT.isoformat(sep=' ')
 
 def convert_datetime(val):
     #print('convert_datetime', val, dt.datetime.fromisoformat(val).replace('T', ' '))
@@ -83,7 +81,7 @@ def checkSanity(runStats, date, where):
                 insaneUsage += fmt.format(str(date), where, which, runPct, saneUsageMax, runTime)
                 return True
     return False
-                                               
+
 def runTimes(c, table, start, end, fanTime, auxTime):
     selectTime = 'SELECT min(dataTime) as first, max(dataTime) as last '\
         ' FROM ' + table +\
@@ -113,7 +111,7 @@ def runTimes(c, table, start, end, fanTime, auxTime):
     c.execute(selectCool, (start, end))
     result = c.fetchone()
     if result is None:
-        cool = 0
+        coolTime = 0
     else:
         coolTime = result['cool']
     elapsed = (last - first).total_seconds()
@@ -197,7 +195,7 @@ def makeSection(c, thermostat, table, title, byDay = False, byMonth = False, yea
             lineRunTm = fmtRunTmLine(runTimes(c, table, start, end,
                                               record['fanRun'], record['auxRun']))
         print(lineTemps + lineRunTm)
-        
+
 def makeReport(c, thermostat, table):
     first, last = getYears(c, table)
     print('---------------------------', thermostat, '----------------------------')
@@ -224,7 +222,7 @@ def makeReport(c, thermostat, table):
 
     #printHeader()
     #makeSection(c, thermostat,  'All', byDay = True)
-    
+
 def main():
     EcobeeDB    = home + '/tools/Ecobee/Thermostats.sql'
     sqlite3.register_adapter(dt.datetime, adapt_datetime)
@@ -233,7 +231,7 @@ def main():
     #db.set_trace_callback(print)
     db.row_factory = sqlite3.Row
     c = db.cursor()
-        
+
     for thermostat in ['LivingRoom', 'Loft']:
         table = thermostat + 'X'
         makeReport(c, thermostat, table)
@@ -241,4 +239,4 @@ def main():
     print(insaneUsage)
 
 if __name__ == '__main__':
-  main()
+    main()
