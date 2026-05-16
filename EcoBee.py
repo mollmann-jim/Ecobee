@@ -152,6 +152,7 @@ class saveEcobeeData():
         self.normalModes = HVACmode
         self.pp = pprint.PrettyPrinter(indent=4, sort_dicts=False)
         self.tz = self.TZ()
+        self.offlines = 0
 
     def initDB(self):
         for table in self.thermostats:
@@ -348,6 +349,9 @@ class saveEcobeeData():
             if API.thermostatsExt[i]['name'] not in self.thermostats:
                 #print('XXX skipping')
                 continue
+            if not API.thermostats[i]['runtime']['connected']:
+                self.__printOffline('ExtRuntimeData:', API.thermostats[i]['name'])
+                continue
             table = API.thermostatsExt[i]['name'] + 'X'
             lastReading = dt.datetime.strptime(API.thermostatsExt[i][ERT]['lastReadingTimestamp'],
                                                '%Y-%m-%d %H:%M:%S')
@@ -363,16 +367,18 @@ class saveEcobeeData():
                 dataTime = lastReading + intvl * fiveMinutes
                 #print(i, intvl, j, lastReading, dataTime)
                 #recode invalid value
-                desiredCool = API.thermostatsExt[i][ERT]['desiredCool'][j] if \
-                    API.thermostatsExt[i][ERT]['desiredCool'][j] < 400 else None
+                desired = {'desiredCool' : None, 'desiredHeat' : None}
+                for HorC in desired:
+                    if API.thermostatsExt[i][ERT][HorC][j] < 400:
+                       desired[HorC] = API.thermostatsExt[i][ERT][HorC][j] / 10.0
                 values = [lastReading,
                           API.thermostatsExt[i][ERT]['runtimeDate'],
                           API.thermostatsExt[i][ERT]['runtimeInterval'],
                           dataTime,
                           API.thermostatsExt[i][ERT]['actualTemperature'][j] / 10.0,
                           API.thermostatsExt[i][ERT]['actualHumidity'][j],
-                          API.thermostatsExt[i][ERT]['desiredHeat'][j] / 10.0,
-                          desiredCool / 10.0,
+                          desired['desiredHeat'],
+                          desired['desiredCool'],
                           API.thermostatsExt[i][ERT]['hvacMode'][j],
                           API.thermostatsExt[i][ERT]['heatPump1'][j],
                           API.thermostatsExt[i][ERT]['heatPump2'][j],
@@ -392,6 +398,9 @@ class saveEcobeeData():
             # wait for initialization
             return
         for i in range(len(API.thermostats)):
+            if not API.thermostats[i]['runtime']['connected']:
+                self.__printOffline('ThermostatData', API.thermostats[i]['name'])
+                continue
             '''
             print(API.thermostats[i]['runtime']['actualTemperature'] / 10.0, \
                   API.thermostats[i]['runtime']['actualHumidity'], \
@@ -641,6 +650,13 @@ class saveEcobeeData():
                 if i == 4:
                     print(dataTime, temperature, humidity, outdoorTemp,
                           zoneClimate, zoneHvacMode)
+                    
+    def __printOffline(self, caller, name):
+        every = 32
+        if not self.offlines % every:
+            now = dt.datetime.now().replace(microsecond = 0)
+            print(now, caller + ':', name + ':', ': Offline', self.offlines + 1, 'times')
+        self.offlines += 1
 
     class TZ():
         def __init__(self):
@@ -840,6 +856,8 @@ class Status:
         # NC gas heat shoiws as aux
         if location == 'NC':
             stat = stat.replace('A', 'H')
+        if not self.API.thermostats[i]['runtime']['connected']:
+            return 'OfL'
         return stat
 
     def printStatusLine(self, location, note = '', reschedule = True):
