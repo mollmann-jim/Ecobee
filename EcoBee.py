@@ -369,7 +369,7 @@ class saveEcobeeData():
                 #recode invalid value
                 desired = {'desiredCool' : None, 'desiredHeat' : None}
                 for HorC in desired:
-                    if API.thermostatsExt[i][ERT][HorC][j] < 400:
+                    if API.thermostatsExt[i][ERT][HorC][j] > 400:
                        desired[HorC] = API.thermostatsExt[i][ERT][HorC][j] / 10.0
                 values = [lastReading,
                           API.thermostatsExt[i][ERT]['runtimeDate'],
